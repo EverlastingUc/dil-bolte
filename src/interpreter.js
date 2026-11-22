@@ -19,7 +19,7 @@ export class HeartInterpreter {
           case "showColumns": return this.engine.showColumns(node.table);
           case "countRows": return this.engine.countRows(node.table);
           case "showRows": return this.engine.showRows(node.table);
-          case "findRows": return this.engine.findRows(node.table, node.column, node.value, node.operator);
+          case "findRows": return this.engine.queryRows(node.table, node.expression);
           case "sortRows": return this.engine.sortRows(node.table, node.column, node.direction);
           case "changeRows": return this.engine.changeRows(node.table, node.changes, node.column, node.value);
           case "removeRows": return this.engine.removeRows(node.table, node.column, node.value);
