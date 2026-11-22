@@ -548,3 +548,67 @@ test("runs the relational example through the CLI", () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("rolls back a multi-command transaction without persisting changes", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-transaction-"));
+  try {
+    const heart = createConstraintClassroom(directory);
+    heart.execute("begin transaction");
+    heart.execute('add row to Students id = 3, email = "new@example.test", name = "New"');
+    heart.execute('change rows in Students set name = "Ever Updated" where id is 1');
+    assert.equal(heart.execute("count rows in Students")[0], 3);
+    assert.equal(heart.execute("rollback transaction")[0], "Transaction rolled back.");
+    assert.equal(heart.execute("count rows in Students")[0], 2);
+    const reopened = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
+    reopened.execute("use database ConstraintSchool");
+    assert.equal(reopened.execute("count rows in Students")[0], 2);
+    assert.deepEqual(reopened.execute('find from Students where id is 1')[0], [
+      { id: 1, email: "ever@example.test", name: "Ever" }
+    ]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("commits a transaction atomically to persistent storage", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-commit-"));
+  try {
+    const heart = createConstraintClassroom(directory);
+    heart.execute("begin transaction");
+    heart.execute('add row to Students id = 3, email = "new@example.test", name = "New"');
+    assert.equal(heart.execute("commit transaction")[0], "Transaction committed.");
+    const reopened = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
+    reopened.execute("use database ConstraintSchool");
+    assert.equal(reopened.execute("count rows in Students")[0], 3);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("rejects nested transactions and database switching during a transaction", () => {
+  const heart = createClassroom();
+  heart.execute("begin transaction");
+  assert.throws(() => heart.execute("begin transaction"), /already active/);
+  assert.throws(() => heart.execute("make database Other"), /during an active transaction/);
+  assert.throws(() => heart.execute("use database School"), /during an active transaction/);
+  heart.execute("rollback transaction");
+  assert.throws(() => heart.execute("commit transaction"), /no active transaction/);
+});
+
+test("rolls back a transaction when the final disk commit fails", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-commit-failure-"));
+  try {
+    const engine = new HeartEngine({ storageDir: directory });
+    const heart = createClassroom(new HeartInterpreter(engine));
+    heart.execute("begin transaction");
+    heart.execute('add row to Students name = "Sam", age = 16');
+    const blockedPath = join(directory, "blocked-storage");
+    writeFileSync(blockedPath, "not a directory");
+    engine.storage.directory = blockedPath;
+    assert.throws(() => heart.execute("commit transaction"), /all changes were rolled back/);
+    assert.equal(heart.execute("count rows in Students")[0], 2);
+    assert.throws(() => heart.execute("rollback transaction"), /no active transaction/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
