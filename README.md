@@ -22,9 +22,11 @@ HEART currently includes:
 - Database and table creation.
 - `text`, `number`, and `boolean` columns.
 - Adding, displaying, counting, changing, and removing rows.
-- Equality, inequality, numeric comparison, and text matching filters with column-type validation.\n- Stable ascending and descending sorting that does not mutate stored row order.
+- Equality, inequality, numeric comparison, and text matching filters with column-type validation.
+- Stable ascending and descending sorting that does not mutate stored row order.
 - Table-column inspection and database listing.
 - Automatic persistence in the CLI.
+- A public JavaScript API exported from `src/index.js`.
 - Automated tests and a Node.js 20/22/24 GitHub Actions matrix.
 
 **Storage behavior:** the CLI saves each database under `.heart/databases/` in the current working directory. Changes are written automatically. The engine can run in memory-only mode when created without a storage directory. The JSON format is an early development format, not yet a stable interchange or backup format. Do not manually edit database files while HEART is running.
@@ -38,6 +40,8 @@ npm test
 npm start -- examples/school.hrt
 npm start
 ```
+
+The first example run creates the School database. To reset the demo and run it again, stop HEART and remove the local `.heart/` directory.
 
 ## First HEART program
 
@@ -60,7 +64,21 @@ show columns from Students
 show databases
 ```
 
-## JavaScript API\n\nThe engine and interpreter can also be imported by other Node.js programs:\n\n```js\nimport { HeartEngine, HeartInterpreter } from "./src/index.js";\n\nconst engine = new HeartEngine(); // in-memory mode\nconst heart = new HeartInterpreter(engine);\nheart.execute("make database Demo\\nuse database Demo");\n```\n\nPass `{ storageDir: "./.heart/databases" }` to `HeartEngine` to enable disk-backed storage.\n\n## Current command reference
+## JavaScript API
+
+The engine and interpreter can also be imported by other Node.js programs:
+
+```js
+import { HeartEngine, HeartInterpreter } from "./src/index.js";
+
+const engine = new HeartEngine(); // in-memory mode
+const heart = new HeartInterpreter(engine);
+heart.execute("make database Demo\nuse database Demo");
+```
+
+Pass `{ storageDir: "./.heart/databases" }` to `HeartEngine` to enable disk-backed storage.
+
+## Current command reference
 
 | Instruction | Purpose |
 |---|---|
@@ -70,16 +88,26 @@ show databases
 | `make table NAME` | Create a table |
 | `add column NAME as TYPE to TABLE` | Add a typed column |
 | `add row to TABLE field = value` | Insert a row |
-| `show columns from TABLE` | Inspect a table's columns and types |
+| `show columns from TABLE` | Inspect table columns and types |
 | `show all from TABLE` | Display every row |
-| `find from TABLE where FIELD is VALUE` | Find rows with an exact match |\n| `find from TABLE where FIELD is not VALUE` | Find rows that do not match |\n| `find from TABLE where FIELD greater than VALUE` | Numeric greater-than filter |\n| `find from TABLE where FIELD less than VALUE` | Numeric less-than filter |\n| `find from TABLE where FIELD at least VALUE` | Numeric greater-than-or-equal filter |\n| `find from TABLE where FIELD at most VALUE` | Numeric less-than-or-equal filter |\n| `find from TABLE where FIELD contains VALUE` | Text substring filter |\n| `find from TABLE where FIELD starts with VALUE` | Text prefix filter |\n| `find from TABLE where FIELD ends with VALUE` | Text suffix filter |\n| `sort rows in TABLE by FIELD ascending` | Sort rows in ascending order |\n| `sort rows in TABLE by FIELD descending` | Sort rows in descending order |
+| `find from TABLE where FIELD is VALUE` | Find rows with an exact match |
+| `find from TABLE where FIELD is not VALUE` | Find rows that do not match |
+| `find from TABLE where FIELD greater than VALUE` | Numeric greater-than filter |
+| `find from TABLE where FIELD less than VALUE` | Numeric less-than filter |
+| `find from TABLE where FIELD at least VALUE` | Numeric greater-than-or-equal filter |
+| `find from TABLE where FIELD at most VALUE` | Numeric less-than-or-equal filter |
+| `find from TABLE where FIELD contains VALUE` | Text substring filter |
+| `find from TABLE where FIELD starts with VALUE` | Text prefix filter |
+| `find from TABLE where FIELD ends with VALUE` | Text suffix filter |
+| `sort rows in TABLE by FIELD ascending` | Sort rows in ascending order |
+| `sort rows in TABLE by FIELD descending` | Sort rows in descending order |
 | `change rows in TABLE set field = value where FIELD is VALUE` | Change matching rows |
 | `remove rows from TABLE where FIELD is VALUE` | Remove matching rows |
 | `count rows in TABLE` | Count rows |
 
 Supported column types: `text`, `number`, `boolean`. Missing fields in inserted rows are stored as `null`. Text values must be double-quoted; numbers and booleans are written directly.
 
-Lines beginning with `#` are comments. Use one instruction per line.
+Lines beginning with `#` are comments. Use one instruction per line. Identifiers that collide with JavaScript object prototype properties are reserved.
 
 ## Development principles
 
@@ -94,8 +122,10 @@ Lines beginning with `#` are comments. Use one instruction per line.
 
 - [x] v0.1: interpreter, in-memory engine, core commands, CLI, tests.
 - [x] v0.2 foundation: JSON persistence, automatic CLI saves, database listing.
-- [x] v0.2 data operations: update, delete, count, and schema inspection.\n- [x] v0.3 query foundation: typed comparison filters, text matching, and stable sorting.
-- [x] v0.2 hardening foundation: rollback on failed writes and clear corruption diagnostics.\n- [ ] v0.2 hardening follow-up: crash recovery and Windows storage testing.
+- [x] v0.2 data operations: update, delete, count, and schema inspection.
+- [x] v0.2 hardening foundation: rollback on failed writes and clear corruption diagnostics.
+- [x] v0.3 query foundation: typed comparison filters, text matching, and stable sorting.
+- [x] v0.3 project packaging: public JS exports, MIT license, changelog, and CI matrix.
 - [ ] v0.3 follow-up: compound conditions (AND/OR), pagination, and query planning.
 - [ ] v0.4: constraints, defaults, and safer schema changes.
 - [ ] v0.5: table relations and joins.
