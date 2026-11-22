@@ -3,14 +3,29 @@ import { HeartStorage } from "./storage.js";
 
 const RESERVED_NAMES = new Set(["__proto__", "constructor", "prototype", "toString", "toLocaleString", "valueOf", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__"]);
 
+function cloneDatabase(database) {
+  return new Map([...database].map(([tableName, table]) => [tableName, {
+    columns: new Map(table.columns),
+    rows: table.rows.map(row => ({ ...row })),
+    constraints: {
+      primaryKey: table.constraints.primaryKey,
+      unique: [...table.constraints.unique],
+      required: [...table.constraints.required],
+      foreignKeys: (table.constraints.foreignKeys ?? []).map(key => ({ ...key }))
+    }
+  }]));
+}
+
 export class HeartEngine {
   constructor({ storageDir = null } = {}) {
     this.databases = new Map();
     this.activeDatabase = null;
     this.storage = storageDir ? new HeartStorage(storageDir) : null;
+    this.transaction = null;
   }
 
   makeDatabase(name) {
+    if (this.transaction) throw new Error("Cannot create a database during an active transaction.");
     this.#assertName(name, "database");
     if (this.databases.has(name) || this.storage?.exists(name)) throw new Error(`Database "${name}" already exists.`);
     this.databases.set(name, new Map());
@@ -24,6 +39,7 @@ export class HeartEngine {
   }
 
   useDatabase(name) {
+    if (this.transaction) throw new Error("Cannot switch databases during an active transaction.");
     this.#assertName(name, "database");
     if (!this.databases.has(name)) {
       const loaded = this.storage?.load(name);
@@ -32,6 +48,38 @@ export class HeartEngine {
     }
     this.activeDatabase = name;
     return `Now using database "${name}".`;
+  }
+
+  beginTransaction() {
+    if (this.transaction) throw new Error("A transaction is already active.");
+    const database = this.#requireDatabase();
+    this.transaction = {
+      databaseName: this.activeDatabase,
+      snapshot: cloneDatabase(database)
+    };
+    return 'Transaction started for "' + this.activeDatabase + '".';
+  }
+
+  commitTransaction() {
+    if (!this.transaction) throw new Error("There is no active transaction to commit.");
+    const { databaseName, snapshot } = this.transaction;
+    try {
+      if (this.storage) this.storage.save(databaseName, this.databases.get(databaseName));
+    } catch (error) {
+      this.databases.set(databaseName, snapshot);
+      this.transaction = null;
+      throw new Error("Transaction commit failed; all changes were rolled back: " + error.message, { cause: error });
+    }
+    this.transaction = null;
+    return "Transaction committed.";
+  }
+
+  rollbackTransaction() {
+    if (!this.transaction) throw new Error("There is no active transaction to roll back.");
+    const { databaseName, snapshot } = this.transaction;
+    this.databases.set(databaseName, snapshot);
+    this.transaction = null;
+    return "Transaction rolled back.";
   }
 
   listDatabases() {
@@ -396,6 +444,7 @@ export class HeartEngine {
   }
 
   #persist(name, tables = this.databases.get(name)) {
+    if (this.transaction?.databaseName === name) return;
     if (this.storage && tables) this.storage.save(name, tables);
   }
 
