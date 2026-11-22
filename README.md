@@ -17,7 +17,7 @@ The long-term architecture includes a lexer, parser, query planner, execution en
 ## Current status: v0.3.0 — persistence, data operations, and query filters
 
 HEART currently includes:
-- A JavaScript interpreter running on Node.js 20+.
+- A JavaScript interpreter running on Node.js 20+.\n- A tokenizer (lexer), syntax parser, and AST-based interpreter pipeline.
 - An in-memory engine and optional JSON-backed disk storage.
 - Database and table creation.
 - `text`, `number`, and `boolean` columns.
@@ -125,7 +125,7 @@ Lines beginning with `#` are comments. Use one instruction per line. Identifiers
 - [x] v0.2 data operations: update, delete, count, and schema inspection.
 - [x] v0.2 hardening foundation: rollback on failed writes and clear corruption diagnostics.
 - [x] v0.3 query foundation: typed comparison filters, text matching, and stable sorting.
-- [x] v0.3 project packaging: public JS exports, MIT license, changelog, and CI matrix.
+- [x] v0.3 project packaging: public JS exports, MIT license, changelog, and CI matrix.\n- [x] v0.3 language frontend: tokenizer, parser, AST nodes, and source-line diagnostics.
 - [ ] v0.3 follow-up: compound conditions (AND/OR), pagination, and query planning.
 - [ ] v0.4: constraints, defaults, and safer schema changes.
 - [ ] v0.5: table relations and joins.
