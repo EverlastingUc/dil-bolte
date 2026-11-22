@@ -60,6 +60,19 @@ export class HeartStorage {
         }
       }
 
+      const savedConstraints = savedTable.constraints ?? { primaryKey: null, unique: [], required: [] };
+      if (!isRecord(savedConstraints)
+        || !(savedConstraints.primaryKey === null || (typeof savedConstraints.primaryKey === "string" && columns.has(savedConstraints.primaryKey)))
+        || !Array.isArray(savedConstraints.unique)
+        || !Array.isArray(savedConstraints.required)
+        || [...savedConstraints.unique, ...savedConstraints.required].some(column => typeof column !== "string" || !columns.has(column))) {
+        throw new Error(`Database "${name}" contains invalid constraints in "${tableName}".`);
+      }
+      const constraints = {
+        primaryKey: savedConstraints.primaryKey,
+        unique: [...new Set(savedConstraints.unique)],
+        required: [...new Set(savedConstraints.required)]
+      };
       const rows = savedTable.rows.map((row, index) => {
         if (!isRecord(row)) throw new Error(`Database "${name}", table "${tableName}": row ${index + 1} is invalid.`);
         for (const [columnName, value] of Object.entries(row)) {
@@ -76,7 +89,23 @@ export class HeartStorage {
         return row;
       });
 
-      tables.set(tableName, { columns, rows });
+      const requiredColumns = new Set([...constraints.required, ...(constraints.primaryKey ? [constraints.primaryKey] : [])]);
+      for (const column of requiredColumns) {
+        if (rows.some(row => row[column] === null)) {
+          throw new Error(`Database "${name}", table "${tableName}": required column "${column}" contains an empty value.`);
+        }
+      }
+      const uniqueColumns = new Set([...constraints.unique, ...(constraints.primaryKey ? [constraints.primaryKey] : [])]);
+      for (const column of uniqueColumns) {
+        const seen = new Set();
+        for (const row of rows) {
+          const value = row[column];
+          if (value === null) continue;
+          if (seen.has(value)) throw new Error(`Database "${name}", table "${tableName}": duplicate value in unique column "${column}".`);
+          seen.add(value);
+        }
+      }
+      tables.set(tableName, { columns, rows, constraints });
     }
     return tables;
   }
@@ -88,7 +117,7 @@ export class HeartStorage {
       tables: Object.fromEntries(
         [...tables].map(([tableName, table]) => [
           tableName,
-          { columns: Object.fromEntries(table.columns), rows: table.rows }
+          { columns: Object.fromEntries(table.columns), rows: table.rows, constraints: table.constraints ?? { primaryKey: null, unique: [], required: [] } }
         ])
       )
     };
