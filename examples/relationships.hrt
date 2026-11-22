@@ -1,0 +1,25 @@
+# HEART relational example: students and course enrollments
+
+make database University
+use database University
+
+make table Students
+add column id as number to Students
+add column name as text to Students
+add constraint primary key on Students id
+
+make table Enrollments
+add column id as number to Enrollments
+add column studentId as number to Enrollments
+add column course as text to Enrollments
+add constraint primary key on Enrollments id
+add constraint foreign key on Enrollments studentId references Students id
+
+add row to Students id = 1, name = "Ever"
+add row to Students id = 2, name = "Alex"
+
+add row to Enrollments id = 101, studentId = 1, course = "Physics"
+add row to Enrollments id = 102, studentId = 2, course = "Mathematics"
+
+join Students with Enrollments on Students id equals Enrollments studentId
+show constraints on Enrollments
