@@ -153,10 +153,12 @@ export class HeartEngine {
     this.#assertConstraints(table, [...table.rows, row]);
     this.#assertDatabaseIntegrity(this.activeDatabase, new Map([[tableName, [...table.rows, row]]]));
     table.rows.push(row);
+    this.#rebuildIndexes(table);
     try {
       this.#persistActive();
     } catch (error) {
       table.rows.pop();
+      this.#rebuildIndexes(table);
       throw error;
     }
     return `1 row added to "${tableName}".`;
@@ -410,10 +412,12 @@ export class HeartEngine {
       for (const [columnName, value] of entries) row[columnName] = value;
     }
     if (matchingRows.length) {
+      this.#rebuildIndexes(table);
       try {
         this.#persistActive();
       } catch (error) {
         matchingRows.forEach((row, index) => Object.assign(row, originals[index]));
+        this.#rebuildIndexes(table);
         throw error;
       }
     }
@@ -431,10 +435,12 @@ export class HeartEngine {
       this.#assertDatabaseIntegrity(this.activeDatabase, new Map([[tableName, remaining]]));
       const originalRows = table.rows;
       table.rows = remaining;
+      this.#rebuildIndexes(table);
       try {
         this.#persistActive();
       } catch (error) {
         table.rows = originalRows;
+        this.#rebuildIndexes(table);
         throw error;
       }
     }
