@@ -6,7 +6,7 @@ const NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const COLUMN_TYPES = new Set(["text", "number", "boolean"]);
 const RESERVED_NAMES = new Set(["__proto__", "constructor", "prototype", "toString", "toLocaleString", "valueOf", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__"]);
 
-function isRecord(value) {
+function buildIndex(rows, column) {\n  const index = new Map();\n  for (const row of rows) {\n    const value = row[column];\n    if (value === null || value === undefined) continue;\n    if (!index.has(value)) index.set(value, new Set());\n    index.get(value).add(row);\n  }\n  return index;\n}\n\nfunction isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
@@ -61,11 +61,12 @@ export class HeartStorage {
       }
 
       const savedConstraints = savedTable.constraints ?? { primaryKey: null, unique: [], required: [], foreignKeys: [] };
+      const savedIndexes = savedTable.indexes ?? [];
       if (!isRecord(savedConstraints)
         || !(savedConstraints.primaryKey === null || (typeof savedConstraints.primaryKey === "string" && columns.has(savedConstraints.primaryKey)))
         || !Array.isArray(savedConstraints.unique)
         || !Array.isArray(savedConstraints.required)
-        || !Array.isArray(savedConstraints.foreignKeys ?? [])
+        || !Array.isArray(savedIndexes)\n        || savedIndexes.some(column => typeof column !== "string" || !columns.has(column))\n        || new Set(savedIndexes).size !== savedIndexes.length\n        || !Array.isArray(savedConstraints.foreignKeys ?? [])
         || [...savedConstraints.unique, ...savedConstraints.required].some(column => typeof column !== "string" || !columns.has(column))
         || (savedConstraints.foreignKeys ?? []).some(key => !isRecord(key)
           || typeof key.column !== "string" || !columns.has(key.column)
@@ -111,7 +112,8 @@ export class HeartStorage {
           seen.add(value);
         }
       }
-      tables.set(tableName, { columns, rows, constraints });
+      const indexes = new Map(savedIndexes.map(column => [column, buildIndex(rows, column)]));
+      tables.set(tableName, { columns, rows, constraints, indexes });
     }
     for (const [tableName, table] of tables) {
       for (const foreignKey of table.constraints.foreignKeys) {
@@ -143,7 +145,7 @@ export class HeartStorage {
       tables: Object.fromEntries(
         [...tables].map(([tableName, table]) => [
           tableName,
-          { columns: Object.fromEntries(table.columns), rows: table.rows, constraints: table.constraints ?? { primaryKey: null, unique: [], required: [], foreignKeys: [] } }
+          { columns: Object.fromEntries(table.columns), rows: table.rows, constraints: table.constraints ?? { primaryKey: null, unique: [], required: [], foreignKeys: [] }, indexes: [...(table.indexes?.keys() ?? [])] }
         ])
       )
     };
