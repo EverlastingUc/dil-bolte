@@ -41,6 +41,12 @@ class LineParser {
       } else {
         node = { type: "addConstraint", constraintType, table, column };
       }
+    } else if (this.takeWords("add", "index", "on")) {
+      node = { type: "addIndex", table: this.identifier(), column: this.identifier() };
+    } else if (this.takeWords("remove", "index", "on")) {
+      node = { type: "removeIndex", table: this.identifier(), column: this.identifier() };
+    } else if (this.takeWords("show", "indexes", "on")) {
+      node = { type: "showIndexes", table: this.identifier() };
     } else if (this.takeWords("show", "constraints", "on")) {
       node = { type: "showConstraints", table: this.identifier() };
     } else if (this.takeWords("add", "row", "to")) {
