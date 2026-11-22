@@ -108,11 +108,59 @@ export class HeartEngine {
     return this.#requireTable(tableName).rows.length;
   }
 
-  findRows(tableName, columnName, expected) {
+  findRows(tableName, columnName, expected, operator = "is") {
     const table = this.#requireTable(tableName);
     this.#requireColumn(table, tableName, columnName);
-    this.#validateValue(columnName, expected, table.columns.get(columnName));
-    return table.rows.filter(row => row[columnName] === expected).map(row => ({ ...row }));
+    const type = table.columns.get(columnName);
+    const textOperators = new Set(["contains", "starts with", "ends with"]);
+    const numericOperators = new Set(["greater than", "less than", "at least", "at most"]);
+
+    if (textOperators.has(operator)) {
+      if (type !== "text" || typeof expected !== "string") throw new Error(`Operator "${operator}" requires a text column and text value.`);
+    } else if (numericOperators.has(operator)) {
+      if (type !== "number" || typeof expected !== "number") throw new Error(`Operator "${operator}" requires a number column and number value.`);
+    } else if (operator === "is" || operator === "is not") {
+      this.#validateValue(columnName, expected, type);
+    } else {
+      throw new Error(`Unknown search operator "${operator}".`);
+    }
+
+    const matches = (actual) => {
+      switch (operator) {
+        case "is": return actual === expected;
+        case "is not": return actual !== expected;
+        case "greater than": return actual !== null && actual > expected;
+        case "less than": return actual !== null && actual < expected;
+        case "at least": return actual !== null && actual >= expected;
+        case "at most": return actual !== null && actual <= expected;
+        case "contains": return actual !== null && actual.includes(expected);
+        case "starts with": return actual !== null && actual.startsWith(expected);
+        case "ends with": return actual !== null && actual.endsWith(expected);
+        default: return false;
+      }
+    };
+    return table.rows.filter(row => matches(row[columnName])).map(row => ({ ...row }));
+  }
+
+  sortRows(tableName, columnName, direction = "ascending") {
+    const table = this.#requireTable(tableName);
+    this.#requireColumn(table, tableName, columnName);
+    const type = table.columns.get(columnName);
+    if (type !== "number" && type !== "text") throw new Error("Sorting is supported for text and number columns only.");
+    if (direction !== "ascending" && direction !== "descending") throw new Error(`Unknown sort direction "${direction}".`);
+    const multiplier = direction === "ascending" ? 1 : -1;
+    return table.rows
+      .map((row, index) => ({ row, index }))
+      .sort((left, right) => {
+        const a = left.row[columnName];
+        const b = right.row[columnName];
+        if (a === null && b === null) return left.index - right.index;
+        if (a === null) return 1;
+        if (b === null) return -1;
+        const comparison = type === "number" ? a - b : a.localeCompare(b);
+        return comparison === 0 ? left.index - right.index : comparison * multiplier;
+      })
+      .map(({ row }) => ({ ...row }));
   }
 
   changeRows(tableName, changes, whereColumn, expected) {
