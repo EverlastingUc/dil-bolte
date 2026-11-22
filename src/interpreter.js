@@ -13,6 +13,9 @@ export class HeartInterpreter {
           case "makeDatabase": return this.engine.makeDatabase(node.name);
           case "useDatabase": return this.engine.useDatabase(node.name);
           case "showDatabases": return this.engine.listDatabases();
+          case "beginTransaction": return this.engine.beginTransaction();
+          case "commitTransaction": return this.engine.commitTransaction();
+          case "rollbackTransaction": return this.engine.rollbackTransaction();
           case "makeTable": return this.engine.makeTable(node.name);
           case "addColumn": return this.engine.addColumn(node.table, node.name, node.columnType);
           case "addConstraint": return this.engine.addConstraint(node.table, node.constraintType, node.column);
