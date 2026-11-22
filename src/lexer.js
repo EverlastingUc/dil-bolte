@@ -30,7 +30,7 @@ export function tokenize(source) {
       position = end + 1;
       continue;
     }
-    if (character === "=" || character === ",") {
+    if (["=", ",", "(", ")"].includes(character)) {
       tokens.push({ type: character, value: character });
       position++;
       continue;
