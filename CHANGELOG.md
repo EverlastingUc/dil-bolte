@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.0] - 2026-11-23
+
+### Added
+- Explicit begin, commit, and rollback transaction instructions.
+- In-memory transaction snapshots with deferred persistence.
+- Atomic commit through the storage engine.
+- Automatic in-memory rollback when a disk commit fails.
+- Guardrails against nested transactions and database switching during a transaction.
+
+
 ## [0.7.0] - 2026-11-23
 
 ### Added
