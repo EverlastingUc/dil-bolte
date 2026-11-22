@@ -27,7 +27,7 @@ async function runFile(filePath) {
 async function runPrompt() {
   const interpreter = createInterpreter();
   const prompt = createInterface({ input: process.stdin, output: process.stdout, prompt: "heart> " });
-  console.log("HEART v0.7.0 — databases are saved automatically; type one instruction per line; type exit to quit.");
+  console.log("HEART v0.8.0 — databases are saved automatically; type one instruction per line; type exit to quit.");
   prompt.prompt();
   for await (const line of prompt) {
     if (line.trim().toLowerCase() === "exit") break;
