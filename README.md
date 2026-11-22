@@ -14,7 +14,7 @@ HEART is being designed as both:
 
 The long-term architecture includes a lexer, parser, query planner, execution engine, storage engine, transactions, indexes, and relational operations.
 
-## Current status: v0.3 foundation — persistence, data operations, and query filters
+## Current status: v0.3.0 — persistence, data operations, and query filters
 
 HEART currently includes:
 - A JavaScript interpreter running on Node.js 20+.
@@ -60,7 +60,7 @@ show columns from Students
 show databases
 ```
 
-## Current command reference
+## JavaScript API\n\nThe engine and interpreter can also be imported by other Node.js programs:\n\n```js\nimport { HeartEngine, HeartInterpreter } from "./src/index.js";\n\nconst engine = new HeartEngine(); // in-memory mode\nconst heart = new HeartInterpreter(engine);\nheart.execute("make database Demo\\nuse database Demo");\n```\n\nPass `{ storageDir: "./.heart/databases" }` to `HeartEngine` to enable disk-backed storage.\n\n## Current command reference
 
 | Instruction | Purpose |
 |---|---|
