@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HeartEngine } from "../src/engine.js";
 import { HeartInterpreter } from "../src/interpreter.js";
+import { HeartEngine as PublicEngine, HeartInterpreter as PublicInterpreter } from "../src/index.js";
 
 function createClassroom(heart = new HeartInterpreter()) {
   heart.execute([
@@ -156,4 +157,9 @@ test("rejects numeric comparisons on text columns", () => {
 test("rejects prototype-sensitive identifiers", () => {
   const heart = new HeartInterpreter();
   assert.throws(() => heart.execute("make database Safe\nuse database Safe\nmake table Items\nadd column constructor as text to Items"), /Invalid column name/);
+});
+
+test("exports the public engine and interpreter API", () => {
+  const interpreter = new PublicInterpreter(new PublicEngine());
+  assert.deepEqual(interpreter.execute("make database PublicApi"), ['Database "PublicApi" created.']);
 });
