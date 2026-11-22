@@ -24,9 +24,20 @@ class LineParser {
       if (this.takeWords("primary", "key")) constraintType = "primary key";
       else if (this.takeWords("unique")) constraintType = "unique";
       else if (this.takeWords("required")) constraintType = "required";
-      else throw new Error("Expected primary key, unique, or required.");
+      else if (this.takeWords("foreign", "key")) constraintType = "foreign key";
+      else throw new Error("Expected primary key, unique, required, or foreign key.");
       this.expectWord("on");
-      node = { type: "addConstraint", constraintType, table: this.identifier(), column: this.identifier() };
+      const table = this.identifier();
+      const column = this.identifier();
+      if (constraintType === "foreign key") {
+        this.expectWord("references");
+        node = {
+          type: "addForeignKey", table, column,
+          referencedTable: this.identifier(), referencedColumn: this.identifier()
+        };
+      } else {
+        node = { type: "addConstraint", constraintType, table, column };
+      }
     } else if (this.takeWords("show", "constraints", "on")) {
       node = { type: "showConstraints", table: this.identifier() };
     } else if (this.takeWords("add", "row", "to")) {
@@ -42,6 +53,20 @@ class LineParser {
       this.expectWord("where");
       const expression = this.expression();
       node = { type: "findRows", table, expression, ...this.pagination() };
+    } else if (this.takeWords("join")) {
+      const leftTable = this.identifier();
+      this.expectWord("with");
+      const rightTable = this.identifier();
+      this.expectWord("on");
+      const leftQualifier = this.identifier();
+      const leftColumn = this.identifier();
+      this.expectWord("equals");
+      const rightQualifier = this.identifier();
+      const rightColumn = this.identifier();
+      if (leftQualifier !== leftTable || rightQualifier !== rightTable) {
+        throw new Error("Join columns must be qualified by their matching table names.");
+      }
+      node = { type: "joinRows", leftTable, rightTable, leftColumn, rightColumn };
     } else if (this.takeWords("sort", "rows", "in")) {
       const table = this.identifier();
       this.expectWord("by");
