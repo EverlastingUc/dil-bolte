@@ -14,7 +14,7 @@ HEART is being designed as both:
 
 The long-term architecture includes a lexer, parser, query planner, execution engine, storage engine, transactions, indexes, and relational operations.
 
-## Current status: v0.6.0 — parsed language frontend, query execution, and constraints
+## Current status: v0.7.0 — relational tables, foreign keys, and joins
 
 HEART currently includes:
 - A JavaScript interpreter running on Node.js 20+.\n- A tokenizer (lexer), syntax parser, and AST-based interpreter pipeline.
@@ -23,7 +23,7 @@ HEART currently includes:
 - `text`, `number`, and `boolean` columns.
 - Adding, displaying, counting, changing, and removing rows.
 - Equality, inequality, numeric comparison, and text matching filters with column-type validation.
-- Stable ascending and descending sorting that does not mutate stored row order.\n- Compound `AND` / `OR` filters, parentheses, and explicit operator precedence.\n- `LIMIT` and `OFFSET` pagination for table scans and filtered queries.\n- Primary-key, unique, and required-column constraints with persistent enforcement.
+- Stable ascending and descending sorting that does not mutate stored row order.\n- Compound `AND` / `OR` filters, parentheses, and explicit operator precedence.\n- `LIMIT` and `OFFSET` pagination for table scans and filtered queries.\n- Primary-key, unique, and required-column constraints with persistent enforcement.\n- Foreign-key constraints with referential-integrity checks on inserts, updates, and deletes.\n- Inner joins between tables using an in-memory lookup index.
 - Table-column inspection and database listing.
 - Automatic persistence in the CLI.
 - A public JavaScript API exported from `src/index.js`.
@@ -76,7 +76,7 @@ const heart = new HeartInterpreter(engine);
 heart.execute("make database Demo\nuse database Demo");
 ```
 
-Pass `{ storageDir: "./.heart/databases" }` to `HeartEngine` to enable disk-backed storage.
+Pass `{ storageDir: "./.heart/databases" }` to `HeartEngine` to enable disk-backed storage.\n\nJoin results are returned as nested objects keyed by table name, for example `{ Students: { ... }, Enrollments: { ... } }`.
 
 ## Current command reference
 
@@ -86,7 +86,7 @@ Pass `{ storageDir: "./.heart/databases" }` to `HeartEngine` to enable disk-back
 | `use database NAME` | Select a database (loads it from disk when available) |
 | `show databases` | List known databases and the active one |
 | `make table NAME` | Create a table |
-| `add column NAME as TYPE to TABLE` | Add a typed column |\n| `add constraint primary key on TABLE COLUMN` | Set the table primary key (unique and required) |\n| `add constraint unique on TABLE COLUMN` | Reject duplicate non-null values |\n| `add constraint required on TABLE COLUMN` | Reject missing or null values |\n| `show constraints on TABLE` | Inspect table constraints |
+| `add column NAME as TYPE to TABLE` | Add a typed column |\n| `add constraint primary key on TABLE COLUMN` | Set the table primary key (unique and required) |\n| `add constraint unique on TABLE COLUMN` | Reject duplicate non-null values |\n| `add constraint required on TABLE COLUMN` | Reject missing or null values |\n| `add constraint foreign key on TABLE COLUMN references OTHER_TABLE OTHER_COLUMN` | Link a column to a unique or primary-key column in another table |\n| `show constraints on TABLE` | Inspect table constraints |\n| `join TABLE with OTHER_TABLE on TABLE COLUMN equals OTHER_TABLE COLUMN` | Return matching rows from both tables as nested objects |
 | `add row to TABLE field = value` | Insert a row |
 | `show columns from TABLE` | Inspect table columns and types |
 | `show all from TABLE` | Display every row |\n| `show all from TABLE limit N` | Return at most N rows |\n| `show all from TABLE limit N offset M` | Skip M rows, then return at most N rows |
@@ -125,7 +125,7 @@ Lines beginning with `#` are comments. Use one instruction per line. Identifiers
 - [x] v0.2 data operations: update, delete, count, and schema inspection.
 - [x] v0.2 hardening foundation: rollback on failed writes and clear corruption diagnostics.
 - [x] v0.3 query foundation: typed comparison filters, text matching, and stable sorting.
-- [x] v0.3 project packaging: public JS exports, MIT license, changelog, and CI matrix.\n- [x] v0.3 language frontend: tokenizer, parser, AST nodes, and source-line diagnostics.\n- [x] v0.4 query expressions: AND, OR, parentheses, precedence, and full expression validation.\n- [x] v0.5 query pagination: LIMIT and OFFSET on table scans and filtered queries.\n- [x] v0.6 schema constraints: primary keys, unique values, required columns, and persistent validation.
+- [x] v0.3 project packaging: public JS exports, MIT license, changelog, and CI matrix.\n- [x] v0.3 language frontend: tokenizer, parser, AST nodes, and source-line diagnostics.\n- [x] v0.4 query expressions: AND, OR, parentheses, precedence, and full expression validation.\n- [x] v0.5 query pagination: LIMIT and OFFSET on table scans and filtered queries.\n- [x] v0.6 schema constraints: primary keys, unique values, required columns, and persistent validation.\n- [x] v0.7 relational foundation: foreign keys, referential integrity, and indexed inner joins.
 - [ ] v0.3 follow-up: compound conditions (AND/OR), pagination, and query planning.
 - [ ] v0.4: constraints, defaults, and safer schema changes.
 - [ ] v0.5: table relations and joins.
