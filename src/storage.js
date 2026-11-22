@@ -1,7 +1,21 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const FORMAT_VERSION = 1;
+const NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const COLUMN_TYPES = new Set(["text", "number", "boolean"]);
+
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function validateStoredValue(value, type) {
+  if (value === null) return true;
+  if (type === "text") return typeof value === "string";
+  if (type === "number") return typeof value === "number" && Number.isFinite(value);
+  if (type === "boolean") return typeof value === "boolean";
+  return false;
+}
 
 export class HeartStorage {
   constructor(directory) {
@@ -17,10 +31,6 @@ export class HeartStorage {
     return existsSync(this.fileFor(name));
   }
 
-  list() {
-    return [];
-  }
-
   load(name) {
     const path = this.fileFor(name);
     if (!existsSync(path)) return null;
@@ -32,19 +42,40 @@ export class HeartStorage {
       throw new Error(`Could not read database "${name}": its data file is not valid JSON.`, { cause: error });
     }
 
-    if (document.formatVersion !== FORMAT_VERSION || document.name !== name || !document.tables || typeof document.tables !== "object") {
+    if (!isRecord(document) || document.formatVersion !== FORMAT_VERSION || document.name !== name || !isRecord(document.tables)) {
       throw new Error(`Database "${name}" uses an unsupported or invalid storage format.`);
     }
 
     const tables = new Map();
     for (const [tableName, savedTable] of Object.entries(document.tables)) {
-      if (!savedTable || !savedTable.columns || typeof savedTable.columns !== "object" || !Array.isArray(savedTable.rows)) {
+      if (!NAME_PATTERN.test(tableName) || !isRecord(savedTable) || !isRecord(savedTable.columns) || !Array.isArray(savedTable.rows)) {
         throw new Error(`Database "${name}" contains an invalid table "${tableName}".`);
       }
-      tables.set(tableName, {
-        columns: new Map(Object.entries(savedTable.columns)),
-        rows: savedTable.rows
+
+      const columns = new Map(Object.entries(savedTable.columns));
+      for (const [columnName, type] of columns) {
+        if (!NAME_PATTERN.test(columnName) || !COLUMN_TYPES.has(type)) {
+          throw new Error(`Database "${name}" contains an invalid column definition in "${tableName}".`);
+        }
+      }
+
+      const rows = savedTable.rows.map((row, index) => {
+        if (!isRecord(row)) throw new Error(`Database "${name}", table "${tableName}": row ${index + 1} is invalid.`);
+        for (const [columnName, value] of Object.entries(row)) {
+          const type = columns.get(columnName);
+          if (!type || !validateStoredValue(value, type)) {
+            throw new Error(`Database "${name}", table "${tableName}": invalid value for column "${columnName}" in row ${index + 1}.`);
+          }
+        }
+        for (const columnName of columns.keys()) {
+          if (!Object.hasOwn(row, columnName)) {
+            throw new Error(`Database "${name}", table "${tableName}": row ${index + 1} is missing column "${columnName}".`);
+          }
+        }
+        return row;
       });
+
+      tables.set(tableName, { columns, rows });
     }
     return tables;
   }
@@ -63,7 +94,12 @@ export class HeartStorage {
 
     const destination = this.fileFor(name);
     const temporary = `${destination}.${process.pid}.tmp`;
-    writeFileSync(temporary, `${JSON.stringify(document, null, 2)}\n`, "utf8");
-    renameSync(temporary, destination);
+    try {
+      writeFileSync(temporary, `${JSON.stringify(document, null, 2)}\n`, { encoding: "utf8", flag: "w" });
+      renameSync(temporary, destination);
+    } catch (error) {
+      try { unlinkSync(temporary); } catch {}
+      throw new Error(`Could not save database "${name}": ${error.message}`, { cause: error });
+    }
   }
 }
