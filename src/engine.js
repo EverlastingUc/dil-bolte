@@ -335,7 +335,9 @@ export class HeartEngine {
       }
     };
     validate(expression);
-    const indexed = this.#indexedCandidates(table, expression);\n    const sourceRows = indexed ?? table.rows;\n    const rows = sourceRows.filter(row => matches(row, expression)).map(row => ({ ...row }));
+    const indexed = this.#indexedCandidates(table, expression);
+    const sourceRows = indexed ?? table.rows;
+    const rows = sourceRows.filter(row => matches(row, expression)).map(row => ({ ...row }));
     return this.#paginate(rows, pagination);
   }
 
