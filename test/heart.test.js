@@ -612,3 +612,73 @@ test("rolls back a transaction when the final disk commit fails", () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("uses explicit hash indexes for equality and compound queries", () => {
+  const heart = createQueryClassroom();
+  heart.execute("add index on Students name");
+  heart.execute("add index on Students age");
+  assert.deepEqual(heart.execute('find from Students where name is "Ever"')[0], [
+    { name: "Ever", age: 18, active: true }
+  ]);
+  assert.deepEqual(heart.execute('find from Students where name is "Ever" or name is "Alex"')[0], [
+    { name: "Ever", age: 18, active: true },
+    { name: "Alex", age: 17, active: false }
+  ]);
+  assert.deepEqual(heart.execute('find from Students where age greater than 17 and name is "Sam"')[0], [
+    { name: "Sam", age: 20, active: false }
+  ]);
+  assert.deepEqual(heart.execute("show indexes on Students")[0], [
+    { column: "name", type: "hash" },
+    { column: "age", type: "hash" }
+  ]);
+});
+
+test("keeps indexes consistent after inserts updates and deletes", () => {
+  const heart = createClassroom();
+  heart.execute("add index on Students name");
+  heart.execute('add row to Students name = "Sam", age = 16');
+  assert.equal(heart.execute('find from Students where name is "Sam"')[0].length, 1);
+  heart.execute('change rows in Students set name = "Samuel" where name is "Sam"');
+  assert.deepEqual(heart.execute('find from Students where name is "Sam"')[0], []);
+  assert.equal(heart.execute('find from Students where name is "Samuel"')[0].length, 1);
+  heart.execute('remove rows from Students where name is "Samuel"');
+  assert.deepEqual(heart.execute('find from Students where name is "Samuel"')[0], []);
+});
+
+test("persists index definitions and rebuilds them after reopening", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-index-persist-"));
+  try {
+    const first = createClassroom(new HeartInterpreter(new HeartEngine({ storageDir: directory })));
+    first.execute("add index on Students name");
+    const second = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
+    second.execute("use database School");
+    assert.deepEqual(second.execute("show indexes on Students")[0], [
+      { column: "name", type: "hash" }
+    ]);
+    assert.deepEqual(second.execute('find from Students where name is "Alex"')[0], [
+      { name: "Alex", age: 17 }
+    ]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("restores index contents when a transaction rolls back", () => {
+  const heart = createClassroom();
+  heart.execute("add index on Students name");
+  heart.execute("begin transaction");
+  heart.execute('change rows in Students set name = "Ever Updated" where name is "Ever"');
+  assert.equal(heart.execute('find from Students where name is "Ever Updated"')[0].length, 1);
+  heart.execute("rollback transaction");
+  assert.equal(heart.execute('find from Students where name is "Ever"')[0].length, 1);
+  assert.deepEqual(heart.execute('find from Students where name is "Ever Updated"')[0], []);
+});
+
+test("removes indexes and rejects duplicate or missing index operations", () => {
+  const heart = createClassroom();
+  heart.execute("add index on Students age");
+  assert.throws(() => heart.execute("add index on Students age"), /already exists/);
+  heart.execute("remove index on Students age");
+  assert.deepEqual(heart.execute("show indexes on Students")[0], []);
+  assert.throws(() => heart.execute("remove index on Students age"), /No index exists/);
+});
