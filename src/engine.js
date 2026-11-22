@@ -51,7 +51,7 @@ export class HeartEngine {
     const database = this.#requireDatabase();
     this.#assertName(name, "table");
     if (database.has(name)) throw new Error(`Table "${name}" already exists.`);
-    database.set(name, { columns: new Map(), rows: [] });
+    database.set(name, { columns: new Map(), rows: [], constraints: { primaryKey: null, unique: [], required: [] } });
     try {
       this.#persistActive();
     } catch (error) {
@@ -87,6 +87,7 @@ export class HeartEngine {
       row[key] = this.#validateValue(key, value, table.columns.get(key));
     }
     for (const key of table.columns.keys()) if (!(key in row)) row[key] = null;
+    this.#assertConstraints(table, [...table.rows, row]);
     table.rows.push(row);
     try {
       this.#persistActive();
@@ -105,6 +106,51 @@ export class HeartEngine {
   showColumns(tableName) {
     const table = this.#requireTable(tableName);
     return [...table.columns].map(([name, type]) => ({ name, type }));
+  }
+
+  showConstraints(tableName) {
+    const { primaryKey, unique, required } = this.#requireTable(tableName).constraints;
+    const result = [];
+    if (primaryKey) result.push({ type: "primary key", column: primaryKey });
+    for (const column of unique) result.push({ type: "unique", column });
+    for (const column of required) result.push({ type: "required", column });
+    return result;
+  }
+
+  addConstraint(tableName, constraintType, columnName) {
+    const table = this.#requireTable(tableName);
+    this.#requireColumn(table, tableName, columnName);
+    const constraints = table.constraints;
+    if (!["primary key", "unique", "required"].includes(constraintType)) {
+      throw new Error('Unknown constraint "' + constraintType + '". Use primary key, unique, or required.');
+    }
+    if (constraintType === "primary key" && constraints.primaryKey) {
+      throw new Error('Table "' + tableName + '" already has a primary key.');
+    }
+    if (constraintType === "unique" && constraints.unique.includes(columnName)) {
+      throw new Error('Column "' + columnName + '" already has a unique constraint.');
+    }
+    if (constraintType === "required" && constraints.required.includes(columnName)) {
+      throw new Error('Column "' + columnName + '" is already required.');
+    }
+
+    const previous = {
+      primaryKey: constraints.primaryKey,
+      unique: [...constraints.unique],
+      required: [...constraints.required]
+    };
+    if (constraintType === "primary key") constraints.primaryKey = columnName;
+    if (constraintType === "unique") constraints.unique.push(columnName);
+    if (constraintType === "required") constraints.required.push(columnName);
+
+    try {
+      this.#assertConstraints(table, table.rows);
+      this.#persistActive();
+    } catch (error) {
+      table.constraints = previous;
+      throw error;
+    }
+    return 'Added ' + constraintType + ' constraint to "' + tableName + '.' + columnName + '".';
   }
 
   countRows(tableName) {
@@ -194,6 +240,8 @@ export class HeartEngine {
     }
 
     const matchingRows = table.rows.filter(row => row[whereColumn] === expected);
+    const candidateRows = table.rows.map(row => matchingRows.includes(row) ? { ...row, ...Object.fromEntries(entries) } : row);
+    this.#assertConstraints(table, candidateRows);
     const originals = matchingRows.map(row => ({ ...row }));
     for (const row of matchingRows) {
       for (const [columnName, value] of entries) row[columnName] = value;
@@ -227,6 +275,26 @@ export class HeartEngine {
       }
     }
     return `${removed} row(s) removed from "${tableName}".`;
+  }
+
+  #assertConstraints(table, rows) {
+    const constraints = table.constraints ?? { primaryKey: null, unique: [], required: [] };
+    const requiredColumns = new Set([...constraints.required, ...(constraints.primaryKey ? [constraints.primaryKey] : [])]);
+    for (const column of requiredColumns) {
+      if (rows.some(row => row[column] === null || row[column] === undefined)) {
+        throw new Error('Column "' + column + '" cannot be empty because it has a required constraint.');
+      }
+    }
+    const uniqueColumns = new Set([...constraints.unique, ...(constraints.primaryKey ? [constraints.primaryKey] : [])]);
+    for (const column of uniqueColumns) {
+      const seen = new Set();
+      for (const row of rows) {
+        const value = row[column];
+        if (value === null || value === undefined) continue;
+        if (seen.has(value)) throw new Error('Duplicate value for unique column "' + column + '".');
+        seen.add(value);
+      }
+    }
   }
 
   #paginate(rows, { limit, offset = 0 } = {}) {
