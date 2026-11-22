@@ -43,7 +43,7 @@ class LineParser {
     } else if (this.takeWords("change", "rows", "in")) {
       const table = this.identifier();
       this.expectWord("set");
-      const changes = this.assignments();
+      const changes = this.assignments(["where"]);
       this.expectWord("where");
       const column = this.identifier();
       this.expectWord("is");
@@ -65,9 +65,9 @@ class LineParser {
     return node;
   }
 
-  assignments() {
+  assignments(stopWords = []) {
     const values = {};
-    while (this.position < this.tokens.length) {
+    while (this.position < this.tokens.length && !stopWords.some(word => this.peekWord(word))) {
       const name = this.identifier();
       if (Object.hasOwn(values, name)) throw new Error(`Field "${name}" was provided more than once.`);
       this.expect("=");
