@@ -14,7 +14,7 @@ HEART is being designed as both:
 
 The long-term architecture includes a lexer, parser, query planner, execution engine, storage engine, transactions, indexes, and relational operations.
 
-## Current status: v0.3.0 — persistence, data operations, and query filters
+## Current status: v0.4.0 — parsed language frontend and compound queries
 
 HEART currently includes:
 - A JavaScript interpreter running on Node.js 20+.\n- A tokenizer (lexer), syntax parser, and AST-based interpreter pipeline.
@@ -23,7 +23,7 @@ HEART currently includes:
 - `text`, `number`, and `boolean` columns.
 - Adding, displaying, counting, changing, and removing rows.
 - Equality, inequality, numeric comparison, and text matching filters with column-type validation.
-- Stable ascending and descending sorting that does not mutate stored row order.
+- Stable ascending and descending sorting that does not mutate stored row order.\n- Compound `AND` / `OR` filters, parentheses, and explicit operator precedence.
 - Table-column inspection and database listing.
 - Automatic persistence in the CLI.
 - A public JavaScript API exported from `src/index.js`.
@@ -98,7 +98,7 @@ Pass `{ storageDir: "./.heart/databases" }` to `HeartEngine` to enable disk-back
 | `find from TABLE where FIELD at most VALUE` | Numeric less-than-or-equal filter |
 | `find from TABLE where FIELD contains VALUE` | Text substring filter |
 | `find from TABLE where FIELD starts with VALUE` | Text prefix filter |
-| `find from TABLE where FIELD ends with VALUE` | Text suffix filter |
+| `find from TABLE where FIELD ends with VALUE` | Text suffix filter |\n| `find from TABLE where CONDITION and CONDITION` | Require both conditions |\n| `find from TABLE where CONDITION or CONDITION` | Match either condition |\n| `find from TABLE where (CONDITION or CONDITION) and CONDITION` | Group conditions with parentheses; AND has higher precedence than OR |
 | `sort rows in TABLE by FIELD ascending` | Sort rows in ascending order |
 | `sort rows in TABLE by FIELD descending` | Sort rows in descending order |
 | `change rows in TABLE set field = value where FIELD is VALUE` | Change matching rows |
@@ -125,7 +125,7 @@ Lines beginning with `#` are comments. Use one instruction per line. Identifiers
 - [x] v0.2 data operations: update, delete, count, and schema inspection.
 - [x] v0.2 hardening foundation: rollback on failed writes and clear corruption diagnostics.
 - [x] v0.3 query foundation: typed comparison filters, text matching, and stable sorting.
-- [x] v0.3 project packaging: public JS exports, MIT license, changelog, and CI matrix.\n- [x] v0.3 language frontend: tokenizer, parser, AST nodes, and source-line diagnostics.
+- [x] v0.3 project packaging: public JS exports, MIT license, changelog, and CI matrix.\n- [x] v0.3 language frontend: tokenizer, parser, AST nodes, and source-line diagnostics.\n- [x] v0.4 query expressions: AND, OR, parentheses, precedence, and full expression validation.
 - [ ] v0.3 follow-up: compound conditions (AND/OR), pagination, and query planning.
 - [ ] v0.4: constraints, defaults, and safer schema changes.
 - [ ] v0.5: table relations and joins.
