@@ -1,30 +1,39 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createInterface } from "node:readline";
+import { HeartEngine } from "./engine.js";
 import { HeartInterpreter } from "./interpreter.js";
 
-async function runFile(filePath) {
-  if (!filePath.endsWith(".hrt")) throw new Error("HEART source files must use the .hrt extension.");
-  const source = await readFile(resolve(filePath), "utf8");
-  const interpreter = new HeartInterpreter();
-  for (const result of interpreter.execute(source)) {
+const storageDir = resolve(process.cwd(), ".heart", "databases");
+
+function createInterpreter() {
+  return new HeartInterpreter(new HeartEngine({ storageDir }));
+}
+
+function printResults(results) {
+  for (const result of results) {
     console.log(Array.isArray(result) ? JSON.stringify(result, null, 2) : result);
   }
 }
 
+async function runFile(filePath) {
+  if (!filePath.endsWith(".hrt")) throw new Error("HEART source files must use the .hrt extension.");
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(resolve(filePath), "utf8");
+  printResults(createInterpreter().execute(source));
+}
+
 async function runPrompt() {
-  const interpreter = new HeartInterpreter();
+  const interpreter = createInterpreter();
   const prompt = createInterface({ input: process.stdin, output: process.stdout, prompt: "heart> " });
-  console.log("HEART v0.1 — type one instruction per line; type exit to quit.");
+  console.log("HEART v0.2 — databases are saved automatically; type one instruction per line; type exit to quit.");
   prompt.prompt();
   for await (const line of prompt) {
     if (line.trim().toLowerCase() === "exit") break;
     if (line.trim()) {
       try {
-        const results = interpreter.execute(line);
-        for (const result of results) console.log(Array.isArray(result) ? JSON.stringify(result, null, 2) : result);
+        printResults(interpreter.execute(line));
       } catch (error) {
         console.error(error.message);
       }
