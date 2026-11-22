@@ -6,7 +6,18 @@ const NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const COLUMN_TYPES = new Set(["text", "number", "boolean"]);
 const RESERVED_NAMES = new Set(["__proto__", "constructor", "prototype", "toString", "toLocaleString", "valueOf", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__"]);
 
-function buildIndex(rows, column) {\n  const index = new Map();\n  for (const row of rows) {\n    const value = row[column];\n    if (value === null || value === undefined) continue;\n    if (!index.has(value)) index.set(value, new Set());\n    index.get(value).add(row);\n  }\n  return index;\n}\n\nfunction isRecord(value) {
+function buildIndex(rows, column) {
+  const index = new Map();
+  for (const row of rows) {
+    const value = row[column];
+    if (value === null || value === undefined) continue;
+    if (!index.has(value)) index.set(value, new Set());
+    index.get(value).add(row);
+  }
+  return index;
+}
+
+function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
