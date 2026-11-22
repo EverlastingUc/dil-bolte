@@ -60,18 +60,24 @@ export class HeartStorage {
         }
       }
 
-      const savedConstraints = savedTable.constraints ?? { primaryKey: null, unique: [], required: [] };
+      const savedConstraints = savedTable.constraints ?? { primaryKey: null, unique: [], required: [], foreignKeys: [] };
       if (!isRecord(savedConstraints)
         || !(savedConstraints.primaryKey === null || (typeof savedConstraints.primaryKey === "string" && columns.has(savedConstraints.primaryKey)))
         || !Array.isArray(savedConstraints.unique)
         || !Array.isArray(savedConstraints.required)
-        || [...savedConstraints.unique, ...savedConstraints.required].some(column => typeof column !== "string" || !columns.has(column))) {
+        || !Array.isArray(savedConstraints.foreignKeys ?? [])
+        || [...savedConstraints.unique, ...savedConstraints.required].some(column => typeof column !== "string" || !columns.has(column))
+        || (savedConstraints.foreignKeys ?? []).some(key => !isRecord(key)
+          || typeof key.column !== "string" || !columns.has(key.column)
+          || typeof key.referencedTable !== "string" || !NAME_PATTERN.test(key.referencedTable)
+          || typeof key.referencedColumn !== "string" || !NAME_PATTERN.test(key.referencedColumn))) {
         throw new Error(`Database "${name}" contains invalid constraints in "${tableName}".`);
       }
       const constraints = {
         primaryKey: savedConstraints.primaryKey,
         unique: [...new Set(savedConstraints.unique)],
-        required: [...new Set(savedConstraints.required)]
+        required: [...new Set(savedConstraints.required)],
+        foreignKeys: (savedConstraints.foreignKeys ?? []).map(key => ({ ...key }))
       };
       const rows = savedTable.rows.map((row, index) => {
         if (!isRecord(row)) throw new Error(`Database "${name}", table "${tableName}": row ${index + 1} is invalid.`);
@@ -107,6 +113,26 @@ export class HeartStorage {
       }
       tables.set(tableName, { columns, rows, constraints });
     }
+    for (const [tableName, table] of tables) {
+      for (const foreignKey of table.constraints.foreignKeys) {
+        const referencedTable = tables.get(foreignKey.referencedTable);
+        if (!referencedTable || !referencedTable.columns.has(foreignKey.referencedColumn)) {
+          throw new Error(`Database "${name}", table "${tableName}": foreign key references a missing table or column.`);
+        }
+        const targetIsUnique = referencedTable.constraints.primaryKey === foreignKey.referencedColumn
+          || referencedTable.constraints.unique.includes(foreignKey.referencedColumn);
+        if (!targetIsUnique || table.columns.get(foreignKey.column) !== referencedTable.columns.get(foreignKey.referencedColumn)) {
+          throw new Error(`Database "${name}", table "${tableName}": foreign key target must be a unique column of the same type.`);
+        }
+        const allowed = new Set(referencedTable.rows.map(row => row[foreignKey.referencedColumn]).filter(value => value !== null));
+        for (const row of table.rows) {
+          const value = row[foreignKey.column];
+          if (value !== null && !allowed.has(value)) {
+            throw new Error(`Database "${name}", table "${tableName}": foreign key value in "${foreignKey.column}" has no matching parent row.`);
+          }
+        }
+      }
+    }
     return tables;
   }
 
@@ -117,7 +143,7 @@ export class HeartStorage {
       tables: Object.fromEntries(
         [...tables].map(([tableName, table]) => [
           tableName,
-          { columns: Object.fromEntries(table.columns), rows: table.rows, constraints: table.constraints ?? { primaryKey: null, unique: [], required: [] } }
+          { columns: Object.fromEntries(table.columns), rows: table.rows, constraints: table.constraints ?? { primaryKey: null, unique: [], required: [], foreignKeys: [] } }
         ])
       )
     };
