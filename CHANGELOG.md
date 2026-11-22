@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.0] - 2026-11-23
+
+### Added
+- Foreign-key constraints referencing primary-key or unique columns.
+- Referential-integrity checks for inserts, updates, deletes, and constraint creation.
+- Persisted foreign-key metadata and validation during database loading.
+- Inner joins implemented with a hash lookup over the right-hand table.
+
+
 ## [0.6.0] - 2026-11-23
 
 ### Added
