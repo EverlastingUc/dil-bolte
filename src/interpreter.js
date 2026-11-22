@@ -21,6 +21,9 @@ export class HeartInterpreter {
           case "addConstraint": return this.engine.addConstraint(node.table, node.constraintType, node.column);
           case "addForeignKey": return this.engine.addForeignKey(node.table, node.column, node.referencedTable, node.referencedColumn);
           case "showConstraints": return this.engine.showConstraints(node.table);
+          case "addIndex": return this.engine.addIndex(node.table, node.column);
+          case "removeIndex": return this.engine.removeIndex(node.table, node.column);
+          case "showIndexes": return this.engine.showIndexes(node.table);
           case "addRow": return this.engine.addRow(node.table, node.values);
           case "showColumns": return this.engine.showColumns(node.table);
           case "countRows": return this.engine.countRows(node.table);
