@@ -533,3 +533,18 @@ test("rejects joins with incompatible column types", () => {
     /same type/
   );
 });
+
+test("runs the relational example through the CLI", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-relational-cli-"));
+  try {
+    const cliPath = fileURLToPath(new URL("../src/cli.js", import.meta.url));
+    const examplePath = fileURLToPath(new URL("../examples/relationships.hrt", import.meta.url));
+    const result = spawnSync(process.execPath, [cliPath, examplePath], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Added foreign key/);
+    assert.match(result.stdout, /Mathematics/);
+    assert.match(result.stdout, /foreign key/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
