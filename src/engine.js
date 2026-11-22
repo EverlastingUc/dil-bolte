@@ -111,37 +111,52 @@ export class HeartEngine {
   }
 
   findRows(tableName, columnName, expected, operator = "is") {
+    return this.queryRows(tableName, { type: "condition", column: columnName, operator, value: expected });
+  }
+
+  queryRows(tableName, expression) {
     const table = this.#requireTable(tableName);
-    this.#requireColumn(table, tableName, columnName);
-    const type = table.columns.get(columnName);
-    const textOperators = new Set(["contains", "starts with", "ends with"]);
-    const numericOperators = new Set(["greater than", "less than", "at least", "at most"]);
-
-    if (textOperators.has(operator)) {
-      if (type !== "text" || typeof expected !== "string") throw new Error(`Operator "${operator}" requires a text column and text value.`);
-    } else if (numericOperators.has(operator)) {
-      if (type !== "number" || typeof expected !== "number") throw new Error(`Operator "${operator}" requires a number column and number value.`);
-    } else if (operator === "is" || operator === "is not") {
-      this.#validateValue(columnName, expected, type);
-    } else {
-      throw new Error(`Unknown search operator "${operator}".`);
-    }
-
-    const matches = (actual) => {
-      switch (operator) {
-        case "is": return actual === expected;
-        case "is not": return actual !== expected;
-        case "greater than": return actual !== null && actual > expected;
-        case "less than": return actual !== null && actual < expected;
-        case "at least": return actual !== null && actual >= expected;
-        case "at most": return actual !== null && actual <= expected;
-        case "contains": return actual !== null && actual.includes(expected);
-        case "starts with": return actual !== null && actual.startsWith(expected);
-        case "ends with": return actual !== null && actual.endsWith(expected);
+    const validate = (node) => {
+      if (!node || typeof node !== "object") throw new Error("Invalid query expression.");
+      if (node.type === "and" || node.type === "or") {
+        validate(node.left);
+        validate(node.right);
+        return;
+      }
+      if (node.type !== "condition") throw new Error("Unknown query expression node.");
+      this.#requireColumn(table, tableName, node.column);
+      const type = table.columns.get(node.column);
+      const textOperators = new Set(["contains", "starts with", "ends with"]);
+      const numericOperators = new Set(["greater than", "less than", "at least", "at most"]);
+      if (textOperators.has(node.operator)) {
+        if (type !== "text" || typeof node.value !== "string") throw new Error(`Operator "${node.operator}" requires a text column and text value.`);
+      } else if (numericOperators.has(node.operator)) {
+        if (type !== "number" || typeof node.value !== "number") throw new Error(`Operator "${node.operator}" requires a number column and number value.`);
+      } else if (node.operator === "is" || node.operator === "is not") {
+        this.#validateValue(node.column, node.value, type);
+      } else {
+        throw new Error(`Unknown search operator "${node.operator}".`);
+      }
+    };
+    const matches = (row, node) => {
+      if (node.type === "and") return matches(row, node.left) && matches(row, node.right);
+      if (node.type === "or") return matches(row, node.left) || matches(row, node.right);
+      const actual = row[node.column];
+      switch (node.operator) {
+        case "is": return actual === node.value;
+        case "is not": return actual !== node.value;
+        case "greater than": return actual !== null && actual > node.value;
+        case "less than": return actual !== null && actual < node.value;
+        case "at least": return actual !== null && actual >= node.value;
+        case "at most": return actual !== null && actual <= node.value;
+        case "contains": return actual !== null && actual.includes(node.value);
+        case "starts with": return actual !== null && actual.startsWith(node.value);
+        case "ends with": return actual !== null && actual.endsWith(node.value);
         default: return false;
       }
     };
-    return table.rows.filter(row => matches(row[columnName])).map(row => ({ ...row }));
+    validate(expression);
+    return table.rows.filter(row => matches(row, expression)).map(row => ({ ...row }));
   }
 
   sortRows(tableName, columnName, direction = "ascending") {
