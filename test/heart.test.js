@@ -209,14 +209,14 @@ test("parses HEART instructions into abstract syntax tree nodes", () => {
 });
 
 test("parses an entire source program and preserves line numbers", () => {
-  assert.deepEqual(parseProgram('# comment\\nmake database School\\n\\nuse database School'), [
+  assert.deepEqual(parseProgram(["# comment", "make database School", "", "use database School"].join("\n")), [
     { type: "makeDatabase", name: "School", line: 2 },
     { type: "useDatabase", name: "School", line: 4 }
   ]);
 });
 
 test("reports lexer and parser errors with source line numbers", () => {
-  assert.throws(() => parseProgram('make database Demo\\nadd row to Items name = "unfinished'), /Line 2: Unterminated text value/);
+  assert.throws(() => parseProgram(["make database Demo", 'add row to Items name = "unfinished'].join("\n")), /Line 2: Unterminated text value/);
   assert.throws(() => parseLine("make database"), /Expected a name/);
 });
 
