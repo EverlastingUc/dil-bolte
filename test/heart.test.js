@@ -431,3 +431,105 @@ test("loads legacy format-version-one tables without constraint metadata", () =>
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+function createRelationalClassroom(storageDir = null) {
+  const engine = new HeartEngine(storageDir ? { storageDir } : {});
+  const heart = new HeartInterpreter(engine);
+  heart.execute([
+    "make database RelationalSchool", "use database RelationalSchool",
+    "make table Students", "add column id as number to Students",
+    "add column name as text to Students", "add constraint primary key on Students id",
+    'add row to Students id = 1, name = "Ever"',
+    'add row to Students id = 2, name = "Alex"',
+    "make table Enrollments", "add column id as number to Enrollments",
+    "add column studentId as number to Enrollments",
+    "add column course as text to Enrollments",
+    "add constraint primary key on Enrollments id",
+    'add row to Enrollments id = 10, studentId = 1, course = "Physics"',
+    'add row to Enrollments id = 11, studentId = 2, course = "Mathematics"',
+    "add constraint foreign key on Enrollments studentId references Students id"
+  ].join("\n"));
+  return heart;
+}
+
+test("enforces foreign keys when inserting rows", () => {
+  const heart = createRelationalClassroom();
+  assert.throws(
+    () => heart.execute('add row to Enrollments id = 12, studentId = 99, course = "Chemistry"'),
+    /Foreign key violation/
+  );
+});
+
+test("prevents deleting or changing a referenced primary key", () => {
+  const heart = createRelationalClassroom();
+  assert.throws(() => heart.execute("remove rows from Students where id is 1"), /Foreign key violation/);
+  assert.throws(() => heart.execute('change rows in Students set id = 99 where id is 1'), /Foreign key violation/);
+  assert.deepEqual(heart.execute("find from Students where id is 1")[0], [{ id: 1, name: "Ever" }]);
+});
+
+test("requires a foreign key to reference a unique column of the same type", () => {
+  const heart = new HeartInterpreter();
+  heart.execute([
+    "make database ForeignKeyRules", "use database ForeignKeyRules",
+    "make table Parents", "add column code as text to Parents",
+    "make table Children", "add column parentCode as text to Children"
+  ].join("\n"));
+  assert.throws(
+    () => heart.execute("add constraint foreign key on Children parentCode references Parents code"),
+    /must be a primary key or unique/
+  );
+  heart.execute("add constraint unique on Parents code");
+  assert.match(
+    heart.execute("add constraint foreign key on Children parentCode references Parents code")[0],
+    /Added foreign key/
+  );
+});
+
+test("persists foreign keys and checks them after reopening", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-foreign-key-"));
+  try {
+    const first = createRelationalClassroom(directory);
+    const second = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
+    second.execute("use database RelationalSchool");
+    assert.deepEqual(second.execute("show constraints on Enrollments")[0], [
+      { type: "primary key", column: "id" },
+      { type: "foreign key", column: "studentId", references: "Students.id" }
+    ]);
+    assert.throws(
+      () => second.execute('add row to Enrollments id = 12, studentId = 99, course = "Chemistry"'),
+      /Foreign key violation/
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("joins related tables using indexed inner-join lookup", () => {
+  const heart = createRelationalClassroom();
+  assert.deepEqual(
+    heart.execute("join Students with Enrollments on Students id equals Enrollments studentId")[0],
+    [
+      {
+        Students: { id: 1, name: "Ever" },
+        Enrollments: { id: 10, studentId: 1, course: "Physics" }
+      },
+      {
+        Students: { id: 2, name: "Alex" },
+        Enrollments: { id: 11, studentId: 2, course: "Mathematics" }
+      }
+    ]
+  );
+});
+
+test("rejects joins with incompatible column types", () => {
+  const heart = new HeartInterpreter();
+  heart.execute([
+    "make database JoinTypes", "use database JoinTypes",
+    "make table LeftSide", "add column code as text to LeftSide",
+    "make table RightSide", "add column code as number to RightSide"
+  ].join("\n"));
+  assert.throws(
+    () => heart.execute("join LeftSide with RightSide on LeftSide code equals RightSide code"),
+    /same type/
+  );
+});
