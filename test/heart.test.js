@@ -1,8 +1,10 @@
 import test from "node:test";
+import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { HeartEngine } from "../src/engine.js";
 import { HeartInterpreter } from "../src/interpreter.js";
 import { HeartEngine as PublicEngine, HeartInterpreter as PublicInterpreter } from "../src/index.js";
@@ -162,4 +164,24 @@ test("rejects prototype-sensitive identifiers", () => {
 test("exports the public engine and interpreter API", () => {
   const interpreter = new PublicInterpreter(new PublicEngine());
   assert.deepEqual(interpreter.execute("make database PublicApi"), ['Database "PublicApi" created.']);
+});
+
+test("runs the example through the CLI and reloads its saved database", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-cli-"));
+  try {
+    const cliPath = fileURLToPath(new URL("../src/cli.js", import.meta.url));
+    const examplePath = fileURLToPath(new URL("../examples/school.hrt", import.meta.url));
+    const created = spawnSync(process.execPath, [cliPath, examplePath], { cwd: directory, encoding: "utf8" });
+    assert.equal(created.status, 0, created.stderr);
+    assert.match(created.stdout, /2 row\(s\) removed/);
+    const reopened = spawnSync(process.execPath, [cliPath], {
+      cwd: directory,
+      input: "use database School\\ncount rows in Students\\nexit\\n",
+      encoding: "utf8"
+    });
+    assert.equal(reopened.status, 0, reopened.stderr);
+    assert.match(reopened.stdout, /1/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
