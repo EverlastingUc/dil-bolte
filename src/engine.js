@@ -1,25 +1,46 @@
-/**
- * Minimal in-memory database engine for HEART v0.1.
- * Persistence, indexes, transactions, and SQL compatibility are future milestones.
- */
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { HeartStorage } from "./storage.js";
 
 export class HeartEngine {
-  constructor() {
+  constructor({ storageDir = null } = {}) {
     this.databases = new Map();
     this.activeDatabase = null;
+    this.storage = storageDir ? new HeartStorage(storageDir) : null;
   }
 
   makeDatabase(name) {
     this.#assertName(name, "database");
-    if (this.databases.has(name)) throw new Error(`Database "${name}" already exists.`);
+    if (this.databases.has(name) || this.storage?.exists(name)) {
+      throw new Error(`Database "${name}" already exists.`);
+    }
     this.databases.set(name, new Map());
+    this.#persist(name);
     return `Database "${name}" created.`;
   }
 
   useDatabase(name) {
-    if (!this.databases.has(name)) throw new Error(`Database "${name}" does not exist.`);
+    this.#assertName(name, "database");
+    if (!this.databases.has(name)) {
+      const loaded = this.storage?.load(name);
+      if (!loaded) throw new Error(`Database "${name}" does not exist.`);
+      this.databases.set(name, loaded);
+    }
     this.activeDatabase = name;
     return `Now using database "${name}".`;
+  }
+
+  listDatabases() {
+    const names = new Set(this.databases.keys());
+    if (this.storage) {
+      for (const entry of readdirSync(this.storage.directory, { withFileTypes: true })) {
+        if (entry.isFile() && entry.name.endsWith(".json")) {
+          const name = entry.name.slice(0, -5);
+          if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) names.add(name);
+        }
+      }
+    }
+    return [...names].sort().map(name => ({ name, active: name === this.activeDatabase }));
   }
 
   makeTable(name) {
@@ -27,6 +48,7 @@ export class HeartEngine {
     this.#assertName(name, "table");
     if (database.has(name)) throw new Error(`Table "${name}" already exists.`);
     database.set(name, { columns: new Map(), rows: [] });
+    this.#persistActive();
     return `Table "${name}" created.`;
   }
 
@@ -39,6 +61,8 @@ export class HeartEngine {
     }
     if (table.columns.has(columnName)) throw new Error(`Column "${columnName}" already exists.`);
     table.columns.set(columnName, normalizedType);
+    for (const row of table.rows) row[columnName] = null;
+    this.#persistActive();
     return `Column "${columnName}" added to "${tableName}".`;
   }
 
@@ -53,18 +77,27 @@ export class HeartEngine {
       if (!(key in row)) row[key] = null;
     }
     table.rows.push(row);
+    this.#persistActive();
     return `1 row added to "${tableName}".`;
   }
 
   showRows(tableName) {
     const table = this.#requireTable(tableName);
-    return table.rows.length ? table.rows.map(row => ({ ...row })) : [];
+    return table.rows.map(row => ({ ...row }));
   }
 
   findRows(tableName, columnName, expected) {
     const table = this.#requireTable(tableName);
     if (!table.columns.has(columnName)) throw new Error(`Column "${columnName}" does not exist in "${tableName}".`);
     return table.rows.filter(row => row[columnName] === expected).map(row => ({ ...row }));
+  }
+
+  #persist(name, tables = this.databases.get(name)) {
+    if (this.storage && tables) this.storage.save(name, tables);
+  }
+
+  #persistActive() {
+    if (this.activeDatabase) this.#persist(this.activeDatabase);
   }
 
   #requireDatabase() {
@@ -80,7 +113,7 @@ export class HeartEngine {
   }
 
   #assertName(name, kind) {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
       throw new Error(`Invalid ${kind} name "${name}". Use letters, numbers, and underscores; do not start with a number.`);
     }
   }
