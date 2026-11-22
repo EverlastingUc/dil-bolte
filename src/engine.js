@@ -3,6 +3,17 @@ import { HeartStorage } from "./storage.js";
 
 const RESERVED_NAMES = new Set(["__proto__", "constructor", "prototype", "toString", "toLocaleString", "valueOf", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__"]);
 
+function buildIndex(rows, column) {
+  const index = new Map();
+  for (const row of rows) {
+    const value = row[column];
+    if (value === null || value === undefined) continue;
+    if (!index.has(value)) index.set(value, new Set());
+    index.get(value).add(row);
+  }
+  return index;
+}
+
 function cloneDatabase(database) {
   return new Map([...database].map(([tableName, table]) => [tableName, {
     columns: new Map(table.columns),
@@ -99,7 +110,7 @@ export class HeartEngine {
     const database = this.#requireDatabase();
     this.#assertName(name, "table");
     if (database.has(name)) throw new Error(`Table "${name}" already exists.`);
-    database.set(name, { columns: new Map(), rows: [], constraints: { primaryKey: null, unique: [], required: [], foreignKeys: [] } });
+    database.set(name, { columns: new Map(), rows: [], constraints: { primaryKey: null, unique: [], required: [], foreignKeys: [] }, indexes: new Map() });
     try {
       this.#persistActive();
     } catch (error) {
@@ -155,6 +166,40 @@ export class HeartEngine {
   showColumns(tableName) {
     const table = this.#requireTable(tableName);
     return [...table.columns].map(([name, type]) => ({ name, type }));
+  }
+
+  showIndexes(tableName) {
+    const table = this.#requireTable(tableName);
+    return [...table.indexes.keys()].map(column => ({ column, type: "hash" }));
+  }
+
+  addIndex(tableName, columnName) {
+    const table = this.#requireTable(tableName);
+    this.#requireColumn(table, tableName, columnName);
+    if (table.indexes.has(columnName)) throw new Error('An index already exists for "' + tableName + "." + columnName + '".');
+    table.indexes.set(columnName, buildIndex(table.rows, columnName));
+    try {
+      this.#persistActive();
+    } catch (error) {
+      table.indexes.delete(columnName);
+      throw error;
+    }
+    return 'Created hash index on "' + tableName + "." + columnName + '".';
+  }
+
+  removeIndex(tableName, columnName) {
+    const table = this.#requireTable(tableName);
+    this.#requireColumn(table, tableName, columnName);
+    if (!table.indexes.has(columnName)) throw new Error('No index exists for "' + tableName + "." + columnName + '".');
+    const previous = table.indexes.get(columnName);
+    table.indexes.delete(columnName);
+    try {
+      this.#persistActive();
+    } catch (error) {
+      table.indexes.set(columnName, previous);
+      throw error;
+    }
+    return 'Removed index from "' + tableName + "." + columnName + '".';
   }
 
   showConstraints(tableName) {
@@ -284,7 +329,7 @@ export class HeartEngine {
       }
     };
     validate(expression);
-    const rows = table.rows.filter(row => matches(row, expression)).map(row => ({ ...row }));
+    const indexed = this.#indexedCandidates(table, expression);\n    const sourceRows = indexed ?? table.rows;\n    const rows = sourceRows.filter(row => matches(row, expression)).map(row => ({ ...row }));
     return this.#paginate(rows, pagination);
   }
 
@@ -390,6 +435,35 @@ export class HeartEngine {
       }
     }
     return `${removed} row(s) removed from "${tableName}".`;
+  }
+
+  #rebuildIndexes(table) {
+    for (const column of table.indexes.keys()) {
+      table.indexes.set(column, buildIndex(table.rows, column));
+    }
+  }
+
+  #indexedCandidates(table, expression) {
+    if (expression.type === "condition") {
+      if (expression.operator !== "is" || !table.indexes.has(expression.column)) return null;
+      return table.indexes.get(expression.column).get(expression.value) ?? new Set();
+    }
+    if (expression.type === "and") {
+      const left = this.#indexedCandidates(table, expression.left);
+      const right = this.#indexedCandidates(table, expression.right);
+      if (left && right) {
+        const [smaller, larger] = left.size <= right.size ? [left, right] : [right, left];
+        return new Set([...smaller].filter(row => larger.has(row)));
+      }
+      return left ?? right;
+    }
+    if (expression.type === "or") {
+      const left = this.#indexedCandidates(table, expression.left);
+      const right = this.#indexedCandidates(table, expression.right);
+      if (!left || !right) return null;
+      return new Set([...left, ...right]);
+    }
+    return null;
   }
 
   #assertDatabaseIntegrity(databaseName, rowOverrides = new Map()) {
