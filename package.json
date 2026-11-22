@@ -19,6 +19,8 @@
     ".": "./src/index.js",
     "./engine": "./src/engine.js",
     "./interpreter": "./src/interpreter.js",
-    "./storage": "./src/storage.js"
+    "./storage": "./src/storage.js",
+    "./lexer": "./src/lexer.js",
+    "./parser": "./src/parser.js"
   }
 }
