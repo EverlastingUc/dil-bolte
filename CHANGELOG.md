@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.0] - 2026-11-23
+
+### Added
+- Explicit hash index creation, removal, and inspection.
+- Persistent index definitions with index rebuilding when a database is loaded.
+- Index-aware equality filtering and candidate-set planning for AND/OR expressions.
+- Index maintenance after inserts, updates, deletes, transaction commits, and rollbacks.
+
+
 ## [0.8.0] - 2026-11-23
 
 ### Added
