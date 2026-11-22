@@ -30,9 +30,8 @@ class LineParser {
     } else if (this.takeWords("find", "from")) {
       const table = this.identifier();
       this.expectWord("where");
-      const column = this.identifier();
-      const operator = this.operator();
-      node = { type: "findRows", table, column, operator, value: this.value() };
+      const expression = this.expression();
+      node = { type: "findRows", table, expression };
     } else if (this.takeWords("sort", "rows", "in")) {
       const table = this.identifier();
       this.expectWord("by");
@@ -80,6 +79,33 @@ class LineParser {
     return values;
   }
 
+  expression() {
+    let expression = this.andExpression();
+    while (this.takeWords("or")) {
+      expression = { type: "or", left: expression, right: this.andExpression() };
+    }
+    return expression;
+  }
+
+  andExpression() {
+    let expression = this.condition();
+    while (this.takeWords("and")) {
+      expression = { type: "and", left: expression, right: this.condition() };
+    }
+    return expression;
+  }
+
+  condition() {
+    if (this.take("(")) {
+      const expression = this.expression();
+      this.expect(")");
+      return expression;
+    }
+    const column = this.identifier();
+    const operator = this.operator();
+    return { type: "condition", column, operator, value: this.value() };
+  }
+
   operator() {
     for (const words of [["is", "not"], ["greater", "than"], ["less", "than"], ["at", "least"], ["at", "most"], ["contains"], ["starts", "with"], ["ends", "with"], ["is"]]) {
       if (this.takeWords(...words)) return words.join(" ");
@@ -120,6 +146,12 @@ class LineParser {
   peekWord(word) {
     const token = this.tokens[this.position];
     return token?.type === "identifier" && token.value.toLowerCase() === word;
+  }
+
+  take(type) {
+    if (this.tokens[this.position]?.type !== type) return false;
+    this.position++;
+    return true;
   }
 
   takeWords(...words) {
