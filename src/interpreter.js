@@ -11,7 +11,7 @@ function parseValue(raw) {
 
 function parseAssignments(source) {
   const result = {};
-  const pattern = /([A-Za-z_][A-Za-z0-9_]*)\s*=\s*("(?:[^"\\\\]|\\\\.)*"|-?(?:0|[1-9]\d*)(?:\.\d+)?|true|false)/gy;
+  const pattern = /([A-Za-z_][A-Za-z0-9_]*)\s*=\s*("(?:\\.|[^"\\])*"|-?(?:0|[1-9]\d*)(?:\.\d+)?|true|false)/gy;
   let position = 0;
   while (position < source.length) {
     while (source[position] === " " || source[position] === ",") position++;
