@@ -201,7 +201,8 @@ test("tokenizes strings with escaped quotes, numbers, booleans, and punctuation"
 
 test("parses HEART instructions into abstract syntax tree nodes", () => {
   assert.deepEqual(parseLine('find from Students where age greater than 17'), {
-    type: "findRows", table: "Students", column: "age", operator: "greater than", value: 17
+    type: "findRows", table: "Students",
+    expression: { type: "condition", column: "age", operator: "greater than", value: 17 }
   });
   assert.deepEqual(parseLine('add row to Students name = "Ever", age = 18'), {
     type: "addRow", table: "Students", values: { name: "Ever", age: 18 }
@@ -227,4 +228,64 @@ test("parses update assignments separately from their WHERE clause", () => {
     changes: { name: "Everlasting", age: 19 },
     column: "name", value: "Ever"
   });
+});
+
+function createQueryClassroom() {
+  const heart = new HeartInterpreter();
+  heart.execute([
+    "make database QuerySchool", "use database QuerySchool", "make table Students",
+    "add column name as text to Students", "add column age as number to Students",
+    "add column active as boolean to Students",
+    'add row to Students name = "Ever", age = 18, active = true',
+    'add row to Students name = "Alex", age = 17, active = false',
+    'add row to Students name = "Sam", age = 20, active = false',
+    'add row to Students name = "Luna", age = 16, active = true'
+  ].join("\n"));
+  return heart;
+}
+
+test("combines WHERE conditions with AND", () => {
+  const heart = createQueryClassroom();
+  assert.deepEqual(
+    heart.execute("find from Students where age greater than 17 and active is true")[0],
+    [{ name: "Ever", age: 18, active: true }]
+  );
+});
+
+test("combines WHERE conditions with OR", () => {
+  const heart = createQueryClassroom();
+  assert.deepEqual(
+    heart.execute('find from Students where name is "Ever" or name is "Alex"')[0],
+    [
+      { name: "Ever", age: 18, active: true },
+      { name: "Alex", age: 17, active: false }
+    ]
+  );
+});
+
+test("AND has higher precedence than OR", () => {
+  const heart = createQueryClassroom();
+  assert.deepEqual(
+    heart.execute('find from Students where age greater than 17 and active is true or name is "Alex"')[0],
+    [
+      { name: "Ever", age: 18, active: true },
+      { name: "Alex", age: 17, active: false }
+    ]
+  );
+});
+
+test("parentheses override logical operator precedence", () => {
+  const heart = createQueryClassroom();
+  assert.deepEqual(
+    heart.execute('find from Students where age greater than 17 and (active is true or name is "Alex")')[0],
+    [{ name: "Ever", age: 18, active: true }]
+  );
+});
+
+test("validates every condition in a compound query", () => {
+  const heart = createQueryClassroom();
+  assert.throws(
+    () => heart.execute('find from Students where name is "Ever" or missing is true'),
+    /Column "missing" does not exist/
+  );
 });
