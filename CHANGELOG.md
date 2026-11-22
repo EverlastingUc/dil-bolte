@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0] - 2026-11-23
+
+### Added
+- LIMIT and OFFSET clauses for table scans and filtered queries.
+- Validation for duplicate, negative, fractional, and unsafe pagination values.
+
+
 ## [0.4.0] - 2026-11-23
 
 ### Added
