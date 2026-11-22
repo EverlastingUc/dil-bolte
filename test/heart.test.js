@@ -318,3 +318,90 @@ test("supports zero LIMIT and rejects invalid pagination values", () => {
   assert.throws(() => heart.execute("show all from Students limit 1.5"), /non-negative whole number/);
   assert.throws(() => heart.execute("show all from Students limit 1 limit 2"), /can only appear once/);
 });
+
+function createConstraintClassroom(storageDir = null) {
+  const engine = new HeartEngine(storageDir ? { storageDir } : {});
+  const heart = new HeartInterpreter(engine);
+  heart.execute([
+    "make database ConstraintSchool", "use database ConstraintSchool", "make table Students",
+    "add column id as number to Students", "add column email as text to Students",
+    "add column name as text to Students",
+    'add row to Students id = 1, email = "ever@example.test", name = "Ever"',
+    'add row to Students id = 2, email = "alex@example.test", name = "Alex"'
+  ].join("\n"));
+  return heart;
+}
+
+test("enforces primary key uniqueness and required values", () => {
+  const heart = createConstraintClassroom();
+  heart.execute("add constraint primary key on Students id");
+  assert.throws(
+    () => heart.execute('add row to Students id = 1, email = "new@example.test", name = "New"'),
+    /Duplicate value for unique column "id"/
+  );
+  assert.throws(
+    () => heart.execute('add row to Students email = "new@example.test", name = "No ID"'),
+    /Column "id" cannot be empty/
+  );
+  assert.deepEqual(heart.execute("show constraints on Students")[0], [
+    { type: "primary key", column: "id" }
+  ]);
+});
+
+test("enforces unique and required constraints", () => {
+  const heart = createConstraintClassroom();
+  heart.execute("add constraint unique on Students email");
+  heart.execute("add constraint required on Students name");
+  assert.throws(
+    () => heart.execute('add row to Students id = 3, email = "ever@example.test", name = "Copy"'),
+    /Duplicate value for unique column "email"/
+  );
+  assert.throws(
+    () => heart.execute('add row to Students id = 3, email = "new@example.test"'),
+    /Column "name" cannot be empty/
+  );
+});
+
+test("does not add a constraint when existing rows violate it", () => {
+  const heart = new HeartInterpreter();
+  heart.execute([
+    "make database ExistingRows", "use database ExistingRows", "make table Items",
+    "add column code as text to Items",
+    'add row to Items code = "same"', 'add row to Items code = "same"'
+  ].join("\n"));
+  assert.throws(() => heart.execute("add constraint unique on Items code"), /Duplicate value/);
+  assert.deepEqual(heart.execute("show constraints on Items")[0], []);
+});
+
+test("rejects constraint-breaking updates without changing any row", () => {
+  const heart = createConstraintClassroom();
+  heart.execute("add constraint unique on Students email");
+  assert.throws(
+    () => heart.execute('change rows in Students set email = "ever@example.test" where name is "Alex"'),
+    /Duplicate value for unique column "email"/
+  );
+  assert.deepEqual(heart.execute('find from Students where name is "Alex"')[0], [
+    { id: 2, email: "alex@example.test", name: "Alex" }
+  ]);
+});
+
+test("persists table constraints and enforces them after reopening", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-constraints-"));
+  try {
+    const first = createConstraintClassroom(directory);
+    first.execute("add constraint primary key on Students id");
+    first.execute("add constraint unique on Students email");
+    const second = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
+    second.execute("use database ConstraintSchool");
+    assert.deepEqual(second.execute("show constraints on Students")[0], [
+      { type: "primary key", column: "id" },
+      { type: "unique", column: "email" }
+    ]);
+    assert.throws(
+      () => second.execute('add row to Students id = 1, email = "new@example.test", name = "Duplicate ID"'),
+      /Duplicate value for unique column "id"/
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
