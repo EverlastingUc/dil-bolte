@@ -14,20 +14,20 @@ HEART is being designed as both:
 
 The long-term architecture includes a lexer, parser, query planner, execution engine, storage engine, transactions, indexes, and relational operations.
 
-## Current status: v0.2 — persistent storage foundation
+## Current status: v0.2 — persistent storage and data operations
 
 HEART currently includes:
 - A JavaScript interpreter running on Node.js 20+.
-- A database engine with optional disk-backed storage.
+- An in-memory engine and optional JSON-backed disk storage.
 - Database and table creation.
 - `text`, `number`, and `boolean` columns.
-- Adding rows, showing rows, and equality searches.
-- Database listing.
-- Automatic JSON persistence for the CLI.
-- A command-line runner for `.hrt` files.
-- Automated tests using Node's built-in test runner.
+- Adding, displaying, counting, changing, and removing rows.
+- Equality searches with column-type validation.
+- Table-column inspection and database listing.
+- Automatic persistence in the CLI.
+- Automated tests and a Node.js 20/22/24 GitHub Actions matrix.
 
-**Storage behavior:** the CLI saves each database under `.heart/databases/` in the current working directory. Database changes are written automatically. The engine can still run in memory-only mode when created without a storage directory. The JSON format is an early development format, not yet a stable interchange or backup format. Do not manually edit database files while HEART is running.
+**Storage behavior:** the CLI saves each database under `.heart/databases/` in the current working directory. Changes are written automatically. The engine can run in memory-only mode when created without a storage directory. The JSON format is an early development format, not yet a stable interchange or backup format. Do not manually edit database files while HEART is running.
 
 ## Quick start
 
@@ -53,6 +53,10 @@ add column active as boolean to Students
 add row to Students name = "Ever", age = 18, active = true
 show all from Students
 find from Students where age is 18
+change rows in Students set age = 19 where name is "Ever"
+remove rows from Students where name is "Alex"
+count rows in Students
+show columns from Students
 show databases
 ```
 
@@ -66,10 +70,14 @@ show databases
 | `make table NAME` | Create a table |
 | `add column NAME as TYPE to TABLE` | Add a typed column |
 | `add row to TABLE field = value` | Insert a row |
+| `show columns from TABLE` | Inspect a table's columns and types |
 | `show all from TABLE` | Display every row |
-| `find from TABLE where FIELD is VALUE` | Find matching rows |
+| `find from TABLE where FIELD is VALUE` | Find rows with an exact match |
+| `change rows in TABLE set field = value where FIELD is VALUE` | Change matching rows |
+| `remove rows from TABLE where FIELD is VALUE` | Remove matching rows |
+| `count rows in TABLE` | Count rows |
 
-Supported column types: `text`, `number`, `boolean`. Missing fields in an inserted row are stored as `null`.
+Supported column types: `text`, `number`, `boolean`. Missing fields in inserted rows are stored as `null`. Text values must be double-quoted; numbers and booleans are written directly.
 
 Lines beginning with `#` are comments. Use one instruction per line.
 
@@ -78,17 +86,18 @@ Lines beginning with `#` are comments. Use one instruction per line.
 1. Keep the language readable for beginners.
 2. Prefer clear English commands over punctuation-heavy syntax.
 3. Give helpful errors that identify the source line.
-4. Build a working foundation before adding advanced database features.
+4. Validate a complete operation before changing stored rows.
 5. Preserve a path toward SQL compatibility without making SQL knowledge a requirement.
 6. Never silently claim durability: storage writes must be tested and documented.
 
 ## Planned milestones
 
 - [x] v0.1: interpreter, in-memory engine, core commands, CLI, tests.
-- [x] v0.2 foundation: JSON disk persistence, automatic CLI saves, database listing.
-- [ ] v0.2 hardening: recovery, corruption diagnostics, schema validation, storage tests on Windows.
-- [ ] v0.3: richer filtering and comparison operators.
-- [ ] v0.4: update and delete operations.
+- [x] v0.2 foundation: JSON persistence, automatic CLI saves, database listing.
+- [x] v0.2 data operations: update, delete, count, and schema inspection.
+- [ ] v0.2 hardening: rollback on storage failures, recovery, corruption diagnostics, and Windows storage testing.
+- [ ] v0.3: richer filtering, sorting, and comparison operators.
+- [ ] v0.4: constraints, defaults, and safer schema changes.
 - [ ] v0.5: table relations and joins.
 - [ ] v1.0: stable engine and a documented SQL compatibility layer.
 
