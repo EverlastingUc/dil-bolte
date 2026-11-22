@@ -12,7 +12,12 @@ export class HeartEngine {
     this.#assertName(name, "database");
     if (this.databases.has(name) || this.storage?.exists(name)) throw new Error(`Database "${name}" already exists.`);
     this.databases.set(name, new Map());
-    this.#persist(name);
+    try {
+      this.#persist(name);
+    } catch (error) {
+      this.databases.delete(name);
+      throw error;
+    }
     return `Database "${name}" created.`;
   }
 
@@ -45,7 +50,12 @@ export class HeartEngine {
     this.#assertName(name, "table");
     if (database.has(name)) throw new Error(`Table "${name}" already exists.`);
     database.set(name, { columns: new Map(), rows: [] });
-    this.#persistActive();
+    try {
+      this.#persistActive();
+    } catch (error) {
+      database.delete(name);
+      throw error;
+    }
     return `Table "${name}" created.`;
   }
 
@@ -57,7 +67,13 @@ export class HeartEngine {
     if (table.columns.has(columnName)) throw new Error(`Column "${columnName}" already exists.`);
     table.columns.set(columnName, normalizedType);
     for (const row of table.rows) row[columnName] = null;
-    this.#persistActive();
+    try {
+      this.#persistActive();
+    } catch (error) {
+      table.columns.delete(columnName);
+      for (const row of table.rows) delete row[columnName];
+      throw error;
+    }
     return `Column "${columnName}" added to "${tableName}".`;
   }
 
@@ -70,7 +86,12 @@ export class HeartEngine {
     }
     for (const key of table.columns.keys()) if (!(key in row)) row[key] = null;
     table.rows.push(row);
-    this.#persistActive();
+    try {
+      this.#persistActive();
+    } catch (error) {
+      table.rows.pop();
+      throw error;
+    }
     return `1 row added to "${tableName}".`;
   }
 
@@ -105,13 +126,20 @@ export class HeartEngine {
       this.#validateValue(columnName, value, table.columns.get(columnName));
     }
 
-    let changed = 0;
-    for (const row of table.rows) {
-      if (row[whereColumn] !== expected) continue;
+    const matchingRows = table.rows.filter(row => row[whereColumn] === expected);
+    const originals = matchingRows.map(row => ({ ...row }));
+    for (const row of matchingRows) {
       for (const [columnName, value] of entries) row[columnName] = value;
-      changed++;
     }
-    if (changed) this.#persistActive();
+    if (matchingRows.length) {
+      try {
+        this.#persistActive();
+      } catch (error) {
+        matchingRows.forEach((row, index) => Object.assign(row, originals[index]));
+        throw error;
+      }
+    }
+    const changed = matchingRows.length;
     return `${changed} row(s) changed in "${tableName}".`;
   }
 
@@ -122,8 +150,14 @@ export class HeartEngine {
     const remaining = table.rows.filter(row => row[whereColumn] !== expected);
     const removed = table.rows.length - remaining.length;
     if (removed) {
+      const originalRows = table.rows;
       table.rows = remaining;
-      this.#persistActive();
+      try {
+        this.#persistActive();
+      } catch (error) {
+        table.rows = originalRows;
+        throw error;
+      }
     }
     return `${removed} row(s) removed from "${tableName}".`;
   }
