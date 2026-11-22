@@ -123,3 +123,32 @@ test("rolls back an insert when the disk write fails", () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("supports numeric comparison operators", () => {
+  const heart = createClassroom();
+  assert.deepEqual(heart.execute("find from Students where age greater than 17")[0], [{ name: "Ever", age: 18 }]);
+  assert.deepEqual(heart.execute("find from Students where age at most 17")[0], [{ name: "Alex", age: 17 }]);
+  assert.deepEqual(heart.execute("find from Students where age is not 18")[0], [{ name: "Alex", age: 17 }]);
+});
+
+test("supports text contains, starts with, and ends with filters", () => {
+  const heart = createClassroom();
+  assert.deepEqual(heart.execute('find from Students where name contains "ve"')[0], [{ name: "Ever", age: 18 }]);
+  assert.deepEqual(heart.execute('find from Students where name starts with "A"')[0], [{ name: "Alex", age: 17 }]);
+  assert.deepEqual(heart.execute('find from Students where name ends with "x"')[0], [{ name: "Alex", age: 17 }]);
+});
+
+test("sorts rows without changing the stored row order", () => {
+  const heart = createClassroom();
+  assert.deepEqual(heart.execute("sort rows in Students by age descending")[0], [
+    { name: "Ever", age: 18 }, { name: "Alex", age: 17 }
+  ]);
+  assert.deepEqual(heart.execute("show all from Students")[0], [
+    { name: "Ever", age: 18 }, { name: "Alex", age: 17 }
+  ]);
+});
+
+test("rejects numeric comparisons on text columns", () => {
+  const heart = createClassroom();
+  assert.throws(() => heart.execute('find from Students where name greater than "Alex"'), /requires a number column/);
+});
