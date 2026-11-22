@@ -16,6 +16,7 @@ export class HeartInterpreter {
           case "makeTable": return this.engine.makeTable(node.name);
           case "addColumn": return this.engine.addColumn(node.table, node.name, node.columnType);
           case "addConstraint": return this.engine.addConstraint(node.table, node.constraintType, node.column);
+          case "addForeignKey": return this.engine.addForeignKey(node.table, node.column, node.referencedTable, node.referencedColumn);
           case "showConstraints": return this.engine.showConstraints(node.table);
           case "addRow": return this.engine.addRow(node.table, node.values);
           case "showColumns": return this.engine.showColumns(node.table);
@@ -23,6 +24,7 @@ export class HeartInterpreter {
           case "showRows": return this.engine.showRows(node.table, node);
           case "findRows": return this.engine.queryRows(node.table, node.expression, node);
           case "sortRows": return this.engine.sortRows(node.table, node.column, node.direction);
+          case "joinRows": return this.engine.joinRows(node.leftTable, node.rightTable, node.leftColumn, node.rightColumn);
           case "changeRows": return this.engine.changeRows(node.table, node.changes, node.column, node.value);
           case "removeRows": return this.engine.removeRows(node.table, node.column, node.value);
           default: throw new Error(`Unknown syntax node "${node.type}".`);
