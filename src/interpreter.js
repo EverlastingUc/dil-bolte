@@ -19,6 +19,7 @@ function parseAssignments(source) {
     pattern.lastIndex = position;
     const match = pattern.exec(source);
     if (!match) throw new Error(`Could not read a field assignment near "${source.slice(position)}".`);
+    if (Object.hasOwn(result, match[1])) throw new Error(`Field "${match[1]}" was provided more than once.`);
     result[match[1]] = parseValue(match[2]);
     position = pattern.lastIndex;
   }
@@ -46,24 +47,15 @@ export class HeartInterpreter {
 
   #executeLine(line) {
     let match;
-    if ((match = line.match(/^make database ([A-Za-z_][A-Za-z0-9_]*)$/i))) {
-      return this.engine.makeDatabase(match[1]);
-    }
-    if ((match = line.match(/^use database ([A-Za-z_][A-Za-z0-9_]*)$/i))) {
-      return this.engine.useDatabase(match[1]);
-    }
-    if ((match = line.match(/^make table ([A-Za-z_][A-Za-z0-9_]*)$/i))) {
-      return this.engine.makeTable(match[1]);
-    }
+    if ((match = line.match(/^make database ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.makeDatabase(match[1]);
+    if ((match = line.match(/^use database ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.useDatabase(match[1]);
+    if (/^show databases$/i.test(line)) return this.engine.listDatabases();
+    if ((match = line.match(/^make table ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.makeTable(match[1]);
     if ((match = line.match(/^add column ([A-Za-z_][A-Za-z0-9_]*) as (text|number|boolean) to ([A-Za-z_][A-Za-z0-9_]*)$/i))) {
       return this.engine.addColumn(match[3], match[1], match[2]);
     }
-    if ((match = line.match(/^add row to ([A-Za-z_][A-Za-z0-9_]*) (.+)$/i))) {
-      return this.engine.addRow(match[1], parseAssignments(match[2]));
-    }
-    if ((match = line.match(/^show all from ([A-Za-z_][A-Za-z0-9_]*)$/i))) {
-      return this.engine.showRows(match[1]);
-    }
+    if ((match = line.match(/^add row to ([A-Za-z_][A-Za-z0-9_]*) (.+)$/i))) return this.engine.addRow(match[1], parseAssignments(match[2]));
+    if ((match = line.match(/^show all from ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.showRows(match[1]);
     if ((match = line.match(/^find from ([A-Za-z_][A-Za-z0-9_]*) where ([A-Za-z_][A-Za-z0-9_]*) is (.+)$/i))) {
       return this.engine.findRows(match[1], match[2], parseValue(match[3]));
     }
