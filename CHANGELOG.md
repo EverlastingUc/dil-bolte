@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0] - 2026-11-23
+
+### Added
+- Dedicated tokenizer and parser that produce line-numbered AST nodes.
+- AST-based interpreter execution.
+- Compound WHERE expressions with AND, OR, parentheses, and explicit precedence.
+- Full expression validation before row evaluation.
+
+
 All notable HEART changes are documented here.
 
 ## [0.3.0] - 2026-11-23
