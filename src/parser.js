@@ -60,7 +60,7 @@ class LineParser {
 
     if (this.position !== this.tokens.length) {
       const token = this.tokens[this.position];
-      throw new Error(`Unexpected token "${String(token.value)}".`);
+      throw new Error('Unexpected token "' + String(token.value) + '".');
     }
     return node;
   }
@@ -69,10 +69,10 @@ class LineParser {
     const values = {};
     while (this.position < this.tokens.length && !stopWords.some(word => this.peekWord(word))) {
       const name = this.identifier();
-      if (Object.hasOwn(values, name)) throw new Error(`Field "${name}" was provided more than once.`);
+      if (Object.hasOwn(values, name)) throw new Error('Field "' + name + '" was provided more than once.');
       this.expect("=");
       values[name] = this.value();
-      if (this.position === this.tokens.length) break;
+      if (this.position === this.tokens.length || stopWords.some(word => this.peekWord(word))) break;
       this.expect(",");
       if (this.position === this.tokens.length) throw new Error("Expected a field assignment after comma.");
     }
@@ -106,14 +106,14 @@ class LineParser {
   }
 
   expectWord(word) {
-    if (!this.takeWords(word)) throw new Error(`Expected "${word}".`);
+    if (!this.takeWords(word)) throw new Error('Expected "' + word + '".');
   }
 
   expect(type) {
     const token = this.tokens[this.position++];
     if (!token || token.type !== type) {
       this.position--;
-      throw new Error(`Expected "${type}".`);
+      throw new Error('Expected "' + type + '".');
     }
   }
 
@@ -135,21 +135,19 @@ class LineParser {
   }
 }
 
-/** Parse one HEART instruction into an abstract syntax tree node. */
 export function parseLine(source) {
   return new LineParser(source).parse();
 }
 
-/** Parse a HEART source program into line-numbered AST nodes. */
 export function parseProgram(source) {
-  return source.split(/\\r?\\n/).flatMap((original, index) => {
+  return source.split(/\r?\n/).flatMap((original, index) => {
     const line = original.trim();
     if (!line || line.startsWith("#")) return [];
     try {
       const node = parseLine(line);
       return node ? [{ ...node, line: index + 1 }] : [];
     } catch (error) {
-      throw new Error(`Line ${index + 1}: ${error.message}`, { cause: error });
+      throw new Error("Line " + (index + 1) + ": " + error.message, { cause: error });
     }
   });
 }
