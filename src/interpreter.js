@@ -58,8 +58,11 @@ export class HeartInterpreter {
     if ((match = line.match(/^show columns from ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.showColumns(match[1]);
     if ((match = line.match(/^count rows in ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.countRows(match[1]);
     if ((match = line.match(/^show all from ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.showRows(match[1]);
-    if ((match = line.match(/^find from ([A-Za-z_][A-Za-z0-9_]*) where ([A-Za-z_][A-Za-z0-9_]*) is (.+)$/i))) {
-      return this.engine.findRows(match[1], match[2], parseValue(match[3]));
+    if ((match = line.match(/^find from ([A-Za-z_][A-Za-z0-9_]*) where ([A-Za-z_][A-Za-z0-9_]*) (is not|greater than|less than|at least|at most|contains|starts with|ends with|is) (.+)$/i))) {
+      return this.engine.findRows(match[1], match[2], parseValue(match[4]), match[3].toLowerCase());
+    }
+    if ((match = line.match(/^sort rows in ([A-Za-z_][A-Za-z0-9_]*) by ([A-Za-z_][A-Za-z0-9_]*)(?: (ascending|descending))?$/i))) {
+      return this.engine.sortRows(match[1], match[2], (match[3] || "ascending").toLowerCase());
     }
     if ((match = line.match(/^change rows in ([A-Za-z_][A-Za-z0-9_]*) set (.+) where ([A-Za-z_][A-Za-z0-9_]*) is (.+)$/i))) {
       return this.engine.changeRows(match[1], parseAssignments(match[2]), match[3], parseValue(match[4]));
