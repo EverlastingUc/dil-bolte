@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.0] - 2026-11-23
+
+### Added
+- Primary-key, unique, and required-column constraints.
+- Constraint inspection through HEART instructions.
+- Constraint enforcement during inserts and updates.
+- Existing-row validation before adding constraints.
+- Persistent constraint metadata and validation when loading database files.
+
+
 ## [0.5.0] - 2026-11-23
 
 ### Added
