@@ -1,30 +1,5 @@
 import { HeartEngine } from "./engine.js";
-
-function parseValue(raw) {
-  const value = raw.trim();
-  if (value.startsWith('"') && value.endsWith('"')) return JSON.parse(value);
-  if (value === "true") return true;
-  if (value === "false") return false;
-  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) return Number(value);
-  throw new Error(`Invalid value "${value}". Use quoted text, a number, true, or false.`);
-}
-
-function parseAssignments(source) {
-  const result = {};
-  const pattern = /([A-Za-z_][A-Za-z0-9_]*)\s*=\s*("(?:\\.|[^"\\])*"|-?(?:0|[1-9]\d*)(?:\.\d+)?|true|false)/gy;
-  let position = 0;
-  while (position < source.length) {
-    while (source[position] === " " || source[position] === ",") position++;
-    if (position >= source.length) break;
-    pattern.lastIndex = position;
-    const match = pattern.exec(source);
-    if (!match) throw new Error(`Could not read a field assignment near "${source.slice(position)}".`);
-    if (Object.hasOwn(result, match[1])) throw new Error(`Field "${match[1]}" was provided more than once.`);
-    result[match[1]] = parseValue(match[2]);
-    position = pattern.lastIndex;
-  }
-  return result;
-}
+import { parseProgram } from "./parser.js";
 
 export class HeartInterpreter {
   constructor(engine = new HeartEngine()) {
@@ -32,44 +7,27 @@ export class HeartInterpreter {
   }
 
   execute(source) {
-    const output = [];
-    for (const [index, originalLine] of source.split(/\r?\n/).entries()) {
-      const line = originalLine.trim();
-      if (!line || line.startsWith("#")) continue;
+    return parseProgram(source).map(node => {
       try {
-        output.push(this.#executeLine(line));
+        switch (node.type) {
+          case "makeDatabase": return this.engine.makeDatabase(node.name);
+          case "useDatabase": return this.engine.useDatabase(node.name);
+          case "showDatabases": return this.engine.listDatabases();
+          case "makeTable": return this.engine.makeTable(node.name);
+          case "addColumn": return this.engine.addColumn(node.table, node.name, node.columnType);
+          case "addRow": return this.engine.addRow(node.table, node.values);
+          case "showColumns": return this.engine.showColumns(node.table);
+          case "countRows": return this.engine.countRows(node.table);
+          case "showRows": return this.engine.showRows(node.table);
+          case "findRows": return this.engine.findRows(node.table, node.column, node.value, node.operator);
+          case "sortRows": return this.engine.sortRows(node.table, node.column, node.direction);
+          case "changeRows": return this.engine.changeRows(node.table, node.changes, node.column, node.value);
+          case "removeRows": return this.engine.removeRows(node.table, node.column, node.value);
+          default: throw new Error(`Unknown syntax node "${node.type}".`);
+        }
       } catch (error) {
-        throw new Error(`Line ${index + 1}: ${error.message}`, { cause: error });
+        throw new Error(`Line ${node.line}: ${error.message}`, { cause: error });
       }
-    }
-    return output;
-  }
-
-  #executeLine(line) {
-    let match;
-    if ((match = line.match(/^make database ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.makeDatabase(match[1]);
-    if ((match = line.match(/^use database ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.useDatabase(match[1]);
-    if (/^show databases$/i.test(line)) return this.engine.listDatabases();
-    if ((match = line.match(/^make table ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.makeTable(match[1]);
-    if ((match = line.match(/^add column ([A-Za-z_][A-Za-z0-9_]*) as (text|number|boolean) to ([A-Za-z_][A-Za-z0-9_]*)$/i))) {
-      return this.engine.addColumn(match[3], match[1], match[2]);
-    }
-    if ((match = line.match(/^add row to ([A-Za-z_][A-Za-z0-9_]*) (.+)$/i))) return this.engine.addRow(match[1], parseAssignments(match[2]));
-    if ((match = line.match(/^show columns from ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.showColumns(match[1]);
-    if ((match = line.match(/^count rows in ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.countRows(match[1]);
-    if ((match = line.match(/^show all from ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.showRows(match[1]);
-    if ((match = line.match(/^find from ([A-Za-z_][A-Za-z0-9_]*) where ([A-Za-z_][A-Za-z0-9_]*) (is not|greater than|less than|at least|at most|contains|starts with|ends with|is) (.+)$/i))) {
-      return this.engine.findRows(match[1], match[2], parseValue(match[4]), match[3].toLowerCase());
-    }
-    if ((match = line.match(/^sort rows in ([A-Za-z_][A-Za-z0-9_]*) by ([A-Za-z_][A-Za-z0-9_]*)(?: (ascending|descending))?$/i))) {
-      return this.engine.sortRows(match[1], match[2], (match[3] || "ascending").toLowerCase());
-    }
-    if ((match = line.match(/^change rows in ([A-Za-z_][A-Za-z0-9_]*) set (.+) where ([A-Za-z_][A-Za-z0-9_]*) is (.+)$/i))) {
-      return this.engine.changeRows(match[1], parseAssignments(match[2]), match[3], parseValue(match[4]));
-    }
-    if ((match = line.match(/^remove rows from ([A-Za-z_][A-Za-z0-9_]*) where ([A-Za-z_][A-Za-z0-9_]*) is (.+)$/i))) {
-      return this.engine.removeRows(match[1], match[2], parseValue(match[3]));
-    }
-    throw new Error(`I do not understand this instruction: "${line}".`);
+    });
   }
 }
