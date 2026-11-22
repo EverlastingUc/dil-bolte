@@ -1,6 +1,8 @@
 import { readdirSync } from "node:fs";
 import { HeartStorage } from "./storage.js";
 
+const RESERVED_NAMES = new Set(["__proto__", "constructor", "prototype", "toString", "toLocaleString", "valueOf", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__"]);
+
 export class HeartEngine {
   constructor({ storageDir = null } = {}) {
     this.databases = new Map();
@@ -234,7 +236,7 @@ export class HeartEngine {
   }
 
   #assertName(name, kind) {
-    if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || RESERVED_NAMES.has(name)) {
       throw new Error(`Invalid ${kind} name "${name}". Use letters, numbers, and underscores; do not start with a number.`);
     }
   }
