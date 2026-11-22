@@ -180,7 +180,7 @@ test("runs the example through the CLI and reloads its saved database", () => {
       encoding: "utf8"
     });
     assert.equal(reopened.status, 0, reopened.stderr);
-    assert.match(reopened.stdout, /\\n1\\n/);
+    assert.match(reopened.stdout, /heart> 1/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
