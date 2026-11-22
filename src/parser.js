@@ -26,12 +26,12 @@ class LineParser {
     } else if (this.takeWords("count", "rows", "in")) {
       node = { type: "countRows", table: this.identifier() };
     } else if (this.takeWords("show", "all", "from")) {
-      node = { type: "showRows", table: this.identifier() };
+      node = { type: "showRows", table: this.identifier(), ...this.pagination() };
     } else if (this.takeWords("find", "from")) {
       const table = this.identifier();
       this.expectWord("where");
       const expression = this.expression();
-      node = { type: "findRows", table, expression };
+      node = { type: "findRows", table, expression, ...this.pagination() };
     } else if (this.takeWords("sort", "rows", "in")) {
       const table = this.identifier();
       this.expectWord("by");
@@ -77,6 +77,20 @@ class LineParser {
     }
     if (Object.keys(values).length === 0) throw new Error("Provide at least one field assignment.");
     return values;
+  }
+
+  pagination() {
+    const result = {};
+    while (this.peekWord("limit") || this.peekWord("offset")) {
+      const key = this.identifier().toLowerCase();
+      if (Object.hasOwn(result, key)) throw new Error('The "' + key + '" clause can only appear once.');
+      const token = this.tokens[this.position++];
+      if (!token || token.type !== "number" || !Number.isSafeInteger(token.value) || token.value < 0) {
+        throw new Error('The "' + key + '" clause requires a non-negative whole number.');
+      }
+      result[key] = token.value;
+    }
+    return result;
   }
 
   expression() {
