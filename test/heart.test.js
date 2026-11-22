@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HeartEngine } from "../src/engine.js";
@@ -48,6 +48,9 @@ test("persists databases and rows across engine instances", () => {
     const second = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
     assert.deepEqual(second.execute("use database School\nshow all from Students")[1], [{ name: "Ever" }]);
     assert.deepEqual(second.execute("show databases")[0], [{ name: "School", active: true }]);
+    second.execute('change rows in Students set name = "Everlasting" where name is "Ever"');
+    const third = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
+    assert.deepEqual(third.execute("use database School\\nshow all from Students")[1], [{ name: "Everlasting" }]);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -92,4 +95,31 @@ test("removes matching rows and reports row counts", () => {
 test("rejects a filter value with the wrong column type", () => {
   const heart = createClassroom();
   assert.throws(() => heart.execute('find from Students where age is "eighteen"'), /expects a number value/);
+});
+
+test("rejects corrupted database files with a useful error", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-corrupt-"));
+  try {
+    writeFileSync(join(directory, "Broken.json"), "{ this is not JSON");
+    const heart = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
+    assert.throws(() => heart.execute("use database Broken"), /not valid JSON/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("rolls back an insert when the disk write fails", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-rollback-"));
+  try {
+    const engine = new HeartEngine({ storageDir: directory });
+    const heart = createClassroom(new HeartInterpreter(engine));
+    const blockedPath = join(directory, "not-a-directory");
+    writeFileSync(blockedPath, "file");
+    engine.storage.directory = blockedPath;
+
+    assert.throws(() => heart.execute('add row to Students name = "Sam", age = 16'), /Could not save database/);
+    assert.equal(heart.execute("count rows in Students")[0], 2);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
