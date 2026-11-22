@@ -4,6 +4,7 @@ import { join } from "node:path";
 const FORMAT_VERSION = 1;
 const NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const COLUMN_TYPES = new Set(["text", "number", "boolean"]);
+const RESERVED_NAMES = new Set(["__proto__", "constructor", "prototype", "toString", "toLocaleString", "valueOf", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__"]);
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -48,13 +49,13 @@ export class HeartStorage {
 
     const tables = new Map();
     for (const [tableName, savedTable] of Object.entries(document.tables)) {
-      if (!NAME_PATTERN.test(tableName) || !isRecord(savedTable) || !isRecord(savedTable.columns) || !Array.isArray(savedTable.rows)) {
+      if (!NAME_PATTERN.test(tableName) || RESERVED_NAMES.has(tableName) || !isRecord(savedTable) || !isRecord(savedTable.columns) || !Array.isArray(savedTable.rows)) {
         throw new Error(`Database "${name}" contains an invalid table "${tableName}".`);
       }
 
       const columns = new Map(Object.entries(savedTable.columns));
       for (const [columnName, type] of columns) {
-        if (!NAME_PATTERN.test(columnName) || !COLUMN_TYPES.has(type)) {
+        if (!NAME_PATTERN.test(columnName) || RESERVED_NAMES.has(columnName) || !COLUMN_TYPES.has(type)) {
           throw new Error(`Database "${name}" contains an invalid column definition in "${tableName}".`);
         }
       }
