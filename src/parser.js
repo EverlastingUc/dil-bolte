@@ -19,6 +19,16 @@ class LineParser {
       const columnType = this.identifier().toLowerCase();
       this.expectWord("to");
       node = { type: "addColumn", name, columnType, table: this.identifier() };
+    } else if (this.takeWords("add", "constraint")) {
+      let constraintType;
+      if (this.takeWords("primary", "key")) constraintType = "primary key";
+      else if (this.takeWords("unique")) constraintType = "unique";
+      else if (this.takeWords("required")) constraintType = "required";
+      else throw new Error("Expected primary key, unique, or required.");
+      this.expectWord("on");
+      node = { type: "addConstraint", constraintType, table: this.identifier(), column: this.identifier() };
+    } else if (this.takeWords("show", "constraints", "on")) {
+      node = { type: "showConstraints", table: this.identifier() };
     } else if (this.takeWords("add", "row", "to")) {
       node = { type: "addRow", table: this.identifier(), values: this.assignments() };
     } else if (this.takeWords("show", "columns", "from")) {
