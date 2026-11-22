@@ -95,7 +95,7 @@ Lines beginning with `#` are comments. Use one instruction per line.
 - [x] v0.1: interpreter, in-memory engine, core commands, CLI, tests.
 - [x] v0.2 foundation: JSON persistence, automatic CLI saves, database listing.
 - [x] v0.2 data operations: update, delete, count, and schema inspection.
-- [ ] v0.2 hardening: rollback on storage failures, recovery, corruption diagnostics, and Windows storage testing.
+- [x] v0.2 hardening foundation: rollback on failed writes and clear corruption diagnostics.\n- [ ] v0.2 hardening follow-up: crash recovery and Windows storage testing.
 - [ ] v0.3: richer filtering, sorting, and comparison operators.
 - [ ] v0.4: constraints, defaults, and safer schema changes.
 - [ ] v0.5: table relations and joins.
