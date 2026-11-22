@@ -173,10 +173,10 @@ test("runs the example through the CLI and reloads its saved database", () => {
     const examplePath = fileURLToPath(new URL("../examples/school.hrt", import.meta.url));
     const created = spawnSync(process.execPath, [cliPath, examplePath], { cwd: directory, encoding: "utf8" });
     assert.equal(created.status, 0, created.stderr);
-    assert.match(created.stdout, /1 row\\(s\\) removed/);
+    assert.match(created.stdout, /1 row\(s\) removed/);
     const reopened = spawnSync(process.execPath, [cliPath], {
       cwd: directory,
-      input: "use database School\\ncount rows in Students\\nexit\\n",
+      input: ["use database School", "count rows in Students", "exit"].join("\n"),
       encoding: "utf8"
     });
     assert.equal(reopened.status, 0, reopened.stderr);
