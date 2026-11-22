@@ -289,3 +289,32 @@ test("validates every condition in a compound query", () => {
     /Column "missing" does not exist/
   );
 });
+
+test("paginates table output with LIMIT and OFFSET", () => {
+  const heart = createClassroom();
+  assert.deepEqual(heart.execute("show all from Students limit 1 offset 1")[0], [
+    { name: "Alex", age: 17 }
+  ]);
+  assert.deepEqual(heart.execute("show all from Students offset 1 limit 1")[0], [
+    { name: "Alex", age: 17 }
+  ]);
+});
+
+test("paginates filtered query results", () => {
+  const heart = createQueryClassroom();
+  assert.deepEqual(
+    heart.execute("find from Students where age greater than 15 limit 2 offset 1")[0],
+    [
+      { name: "Alex", age: 17, active: false },
+      { name: "Sam", age: 20, active: false }
+    ]
+  );
+});
+
+test("supports zero LIMIT and rejects invalid pagination values", () => {
+  const heart = createClassroom();
+  assert.deepEqual(heart.execute("show all from Students limit 0")[0], []);
+  assert.throws(() => heart.execute("show all from Students limit -1"), /non-negative whole number/);
+  assert.throws(() => heart.execute("show all from Students limit 1.5"), /non-negative whole number/);
+  assert.throws(() => heart.execute("show all from Students limit 1 limit 2"), /can only appear once/);
+});
