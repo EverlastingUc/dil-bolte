@@ -14,7 +14,7 @@ HEART is being designed as both:
 
 The long-term architecture includes a lexer, parser, query planner, execution engine, storage engine, transactions, indexes, and relational operations.
 
-## Current status: v0.2 — persistent storage and data operations
+## Current status: v0.3 foundation — persistence, data operations, and query filters
 
 HEART currently includes:
 - A JavaScript interpreter running on Node.js 20+.
@@ -22,7 +22,7 @@ HEART currently includes:
 - Database and table creation.
 - `text`, `number`, and `boolean` columns.
 - Adding, displaying, counting, changing, and removing rows.
-- Equality searches with column-type validation.
+- Equality, inequality, numeric comparison, and text matching filters with column-type validation.\n- Stable ascending and descending sorting that does not mutate stored row order.
 - Table-column inspection and database listing.
 - Automatic persistence in the CLI.
 - Automated tests and a Node.js 20/22/24 GitHub Actions matrix.
@@ -72,7 +72,7 @@ show databases
 | `add row to TABLE field = value` | Insert a row |
 | `show columns from TABLE` | Inspect a table's columns and types |
 | `show all from TABLE` | Display every row |
-| `find from TABLE where FIELD is VALUE` | Find rows with an exact match |
+| `find from TABLE where FIELD is VALUE` | Find rows with an exact match |\n| `find from TABLE where FIELD is not VALUE` | Find rows that do not match |\n| `find from TABLE where FIELD greater than VALUE` | Numeric greater-than filter |\n| `find from TABLE where FIELD less than VALUE` | Numeric less-than filter |\n| `find from TABLE where FIELD at least VALUE` | Numeric greater-than-or-equal filter |\n| `find from TABLE where FIELD at most VALUE` | Numeric less-than-or-equal filter |\n| `find from TABLE where FIELD contains VALUE` | Text substring filter |\n| `find from TABLE where FIELD starts with VALUE` | Text prefix filter |\n| `find from TABLE where FIELD ends with VALUE` | Text suffix filter |\n| `sort rows in TABLE by FIELD ascending` | Sort rows in ascending order |\n| `sort rows in TABLE by FIELD descending` | Sort rows in descending order |
 | `change rows in TABLE set field = value where FIELD is VALUE` | Change matching rows |
 | `remove rows from TABLE where FIELD is VALUE` | Remove matching rows |
 | `count rows in TABLE` | Count rows |
@@ -94,9 +94,9 @@ Lines beginning with `#` are comments. Use one instruction per line.
 
 - [x] v0.1: interpreter, in-memory engine, core commands, CLI, tests.
 - [x] v0.2 foundation: JSON persistence, automatic CLI saves, database listing.
-- [x] v0.2 data operations: update, delete, count, and schema inspection.
+- [x] v0.2 data operations: update, delete, count, and schema inspection.\n- [x] v0.3 query foundation: typed comparison filters, text matching, and stable sorting.
 - [x] v0.2 hardening foundation: rollback on failed writes and clear corruption diagnostics.\n- [ ] v0.2 hardening follow-up: crash recovery and Windows storage testing.
-- [ ] v0.3: richer filtering, sorting, and comparison operators.
+- [ ] v0.3 follow-up: compound conditions (AND/OR), pagination, and query planning.
 - [ ] v0.4: constraints, defaults, and safer schema changes.
 - [ ] v0.5: table relations and joins.
 - [ ] v1.0: stable engine and a documented SQL compatibility layer.
