@@ -405,3 +405,29 @@ test("persists table constraints and enforces them after reopening", () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("loads legacy format-version-one tables without constraint metadata", () => {
+  const directory = mkdtempSync(join(tmpdir(), "heart-legacy-"));
+  try {
+    writeFileSync(join(directory, "Legacy.json"), JSON.stringify({
+      formatVersion: 1,
+      name: "Legacy",
+      tables: {
+        Items: {
+          columns: { code: "text" },
+          rows: [{ code: "original" }]
+        }
+      }
+    }));
+    const heart = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
+    heart.execute("use database Legacy");
+    assert.deepEqual(heart.execute("show constraints on Items")[0], []);
+    assert.deepEqual(heart.execute("show all from Items")[0], [{ code: "original" }]);
+    heart.execute('add row to Items code = "new"');
+    const reopened = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
+    reopened.execute("use database Legacy");
+    assert.equal(reopened.execute("count rows in Items")[0], 2);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
