@@ -6,27 +6,29 @@ import { join } from "node:path";
 import { HeartEngine } from "../src/engine.js";
 import { HeartInterpreter } from "../src/interpreter.js";
 
+function createClassroom(heart = new HeartInterpreter()) {
+  heart.execute([
+    "make database School", "use database School", "make table Students",
+    "add column name as text to Students", "add column age as number to Students",
+    'add row to Students name = "Ever", age = 18',
+    'add row to Students name = "Alex", age = 17'
+  ].join("\n"));
+  return heart;
+}
+
 test("creates a database, table, columns, and rows", () => {
   const heart = new HeartInterpreter();
   const output = heart.execute([
-    "make database School",
-    "use database School",
-    "make table Students",
-    "add column name as text to Students",
-    "add column age as number to Students",
-    'add row to Students name = "Ever", age = 18',
-    "show all from Students"
+    "make database School", "use database School", "make table Students",
+    "add column name as text to Students", "add column age as number to Students",
+    'add row to Students name = "Ever", age = 18', "show all from Students"
   ].join("\n"));
   assert.deepEqual(output.at(-1), [{ name: "Ever", age: 18 }]);
 });
 
 test("finds rows with a matching value", () => {
-  const heart = new HeartInterpreter();
-  heart.execute([
-    "make database School", "use database School", "make table Students",
-    "add column age as number to Students", "add row to Students age = 18", "add row to Students age = 17"
-  ].join("\n"));
-  assert.deepEqual(heart.execute("find from Students where age is 18")[0], [{ age: 18 }]);
+  const heart = createClassroom();
+  assert.deepEqual(heart.execute("find from Students where age is 18")[0], [{ name: "Ever", age: 18 }]);
 });
 
 test("reports a useful error for unknown instructions", () => {
@@ -61,4 +63,33 @@ test("adding a column keeps existing rows valid", () => {
   const heart = new HeartInterpreter();
   heart.execute('make database SchemaTest\nuse database SchemaTest\nmake table Items\nadd column name as text to Items\nadd row to Items name = "A"\nadd column score as number to Items');
   assert.deepEqual(heart.execute("show all from Items")[0], [{ name: "A", score: null }]);
+});
+
+test("changes every matching row and persists the new values", () => {
+  const heart = createClassroom();
+  assert.match(heart.execute('change rows in Students set age = 19 where name is "Ever"')[0], /1 row\(s\) changed/);
+  assert.deepEqual(heart.execute("find from Students where age is 19")[0], [{ name: "Ever", age: 19 }]);
+});
+
+test("validates all changed values before modifying any row", () => {
+  const heart = createClassroom();
+  assert.throws(
+    () => heart.execute('change rows in Students set age = 20, name = 42 where name is "Ever"'),
+    /expects a text value/
+  );
+  assert.deepEqual(heart.execute("find from Students where name is \"Ever\"")[0], [{ name: "Ever", age: 18 }]);
+});
+
+test("removes matching rows and reports row counts", () => {
+  const heart = createClassroom();
+  assert.match(heart.execute('remove rows from Students where name is "Alex"')[0], /1 row\(s\) removed/);
+  assert.equal(heart.execute("count rows in Students")[0], 1);
+  assert.deepEqual(heart.execute("show columns from Students")[0], [
+    { name: "name", type: "text" }, { name: "age", type: "number" }
+  ]);
+});
+
+test("rejects a filter value with the wrong column type", () => {
+  const heart = createClassroom();
+  assert.throws(() => heart.execute('find from Students where age is "eighteen"'), /expects a number value/);
 });
