@@ -41,7 +41,7 @@ npm start -- examples/school.hrt
 npm start
 ```
 
-The first example run creates the School database. To reset the demo and run it again, stop HEART and remove the local `.heart/` directory.
+The first example creates the School database; the second demonstrates foreign keys and joins in a separate University database. To reset the demos and run them again, stop HEART and remove the local `.heart/` directory.
 
 ## First HEART program
 
