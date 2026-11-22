@@ -50,7 +50,7 @@ test("persists databases and rows across engine instances", () => {
     assert.deepEqual(second.execute("show databases")[0], [{ name: "School", active: true }]);
     second.execute('change rows in Students set name = "Everlasting" where name is "Ever"');
     const third = new HeartInterpreter(new HeartEngine({ storageDir: directory }));
-    assert.deepEqual(third.execute("use database School\\nshow all from Students")[1], [{ name: "Everlasting" }]);
+    assert.deepEqual(third.execute(["use database School", "show all from Students"].join("\n"))[1], [{ name: "Everlasting" }]);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
