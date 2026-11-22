@@ -55,9 +55,17 @@ export class HeartInterpreter {
       return this.engine.addColumn(match[3], match[1], match[2]);
     }
     if ((match = line.match(/^add row to ([A-Za-z_][A-Za-z0-9_]*) (.+)$/i))) return this.engine.addRow(match[1], parseAssignments(match[2]));
+    if ((match = line.match(/^show columns from ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.showColumns(match[1]);
+    if ((match = line.match(/^count rows in ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.countRows(match[1]);
     if ((match = line.match(/^show all from ([A-Za-z_][A-Za-z0-9_]*)$/i))) return this.engine.showRows(match[1]);
     if ((match = line.match(/^find from ([A-Za-z_][A-Za-z0-9_]*) where ([A-Za-z_][A-Za-z0-9_]*) is (.+)$/i))) {
       return this.engine.findRows(match[1], match[2], parseValue(match[3]));
+    }
+    if ((match = line.match(/^change rows in ([A-Za-z_][A-Za-z0-9_]*) set (.+) where ([A-Za-z_][A-Za-z0-9_]*) is (.+)$/i))) {
+      return this.engine.changeRows(match[1], parseAssignments(match[2]), match[3], parseValue(match[4]));
+    }
+    if ((match = line.match(/^remove rows from ([A-Za-z_][A-Za-z0-9_]*) where ([A-Za-z_][A-Za-z0-9_]*) is (.+)$/i))) {
+      return this.engine.removeRows(match[1], match[2], parseValue(match[3]));
     }
     throw new Error(`I do not understand this instruction: "${line}".`);
   }
