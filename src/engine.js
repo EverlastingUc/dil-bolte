@@ -10,9 +10,7 @@ export class HeartEngine {
 
   makeDatabase(name) {
     this.#assertName(name, "database");
-    if (this.databases.has(name) || this.storage?.exists(name)) {
-      throw new Error(`Database "${name}" already exists.`);
-    }
+    if (this.databases.has(name) || this.storage?.exists(name)) throw new Error(`Database "${name}" already exists.`);
     this.databases.set(name, new Map());
     this.#persist(name);
     return `Database "${name}" created.`;
@@ -55,9 +53,7 @@ export class HeartEngine {
     const table = this.#requireTable(tableName);
     this.#assertName(columnName, "column");
     const normalizedType = String(type).toLowerCase();
-    if (!["text", "number", "boolean"].includes(normalizedType)) {
-      throw new Error(`Unknown type "${type}". Use text, number, or boolean.`);
-    }
+    if (!["text", "number", "boolean"].includes(normalizedType)) throw new Error(`Unknown type "${type}". Use text, number, or boolean.`);
     if (table.columns.has(columnName)) throw new Error(`Column "${columnName}" already exists.`);
     table.columns.set(columnName, normalizedType);
     for (const row of table.rows) row[columnName] = null;
@@ -72,23 +68,68 @@ export class HeartEngine {
       if (!table.columns.has(key)) throw new Error(`Column "${key}" does not exist in "${tableName}".`);
       row[key] = this.#validateValue(key, value, table.columns.get(key));
     }
-    for (const key of table.columns.keys()) {
-      if (!(key in row)) row[key] = null;
-    }
+    for (const key of table.columns.keys()) if (!(key in row)) row[key] = null;
     table.rows.push(row);
     this.#persistActive();
     return `1 row added to "${tableName}".`;
   }
 
   showRows(tableName) {
+    return this.#requireTable(tableName).rows.map(row => ({ ...row }));
+  }
+
+  showColumns(tableName) {
     const table = this.#requireTable(tableName);
-    return table.rows.map(row => ({ ...row }));
+    return [...table.columns].map(([name, type]) => ({ name, type }));
+  }
+
+  countRows(tableName) {
+    return this.#requireTable(tableName).rows.length;
   }
 
   findRows(tableName, columnName, expected) {
     const table = this.#requireTable(tableName);
-    if (!table.columns.has(columnName)) throw new Error(`Column "${columnName}" does not exist in "${tableName}".`);
+    this.#requireColumn(table, tableName, columnName);
+    this.#validateValue(columnName, expected, table.columns.get(columnName));
     return table.rows.filter(row => row[columnName] === expected).map(row => ({ ...row }));
+  }
+
+  changeRows(tableName, changes, whereColumn, expected) {
+    const table = this.#requireTable(tableName);
+    this.#requireColumn(table, tableName, whereColumn);
+    this.#validateValue(whereColumn, expected, table.columns.get(whereColumn));
+    const entries = Object.entries(changes);
+    if (entries.length === 0) throw new Error("Provide at least one field to change.");
+    for (const [columnName, value] of entries) {
+      this.#requireColumn(table, tableName, columnName);
+      this.#validateValue(columnName, value, table.columns.get(columnName));
+    }
+
+    let changed = 0;
+    for (const row of table.rows) {
+      if (row[whereColumn] !== expected) continue;
+      for (const [columnName, value] of entries) row[columnName] = value;
+      changed++;
+    }
+    if (changed) this.#persistActive();
+    return `${changed} row(s) changed in "${tableName}".`;
+  }
+
+  removeRows(tableName, whereColumn, expected) {
+    const table = this.#requireTable(tableName);
+    this.#requireColumn(table, tableName, whereColumn);
+    this.#validateValue(whereColumn, expected, table.columns.get(whereColumn));
+    const remaining = table.rows.filter(row => row[whereColumn] !== expected);
+    const removed = table.rows.length - remaining.length;
+    if (removed) {
+      table.rows = remaining;
+      this.#persistActive();
+    }
+    return `${removed} row(s) removed from "${tableName}".`;
+  }
+
+  #requireColumn(table, tableName, columnName) {
+    if (!table.columns.has(columnName)) throw new Error(`Column "${columnName}" does not exist in "${tableName}".`);
   }
 
   #persist(name, tables = this.databases.get(name)) {
@@ -105,8 +146,7 @@ export class HeartEngine {
   }
 
   #requireTable(name) {
-    const database = this.#requireDatabase();
-    const table = database.get(name);
+    const table = this.#requireDatabase().get(name);
     if (!table) throw new Error(`Table "${name}" does not exist.`);
     return table;
   }
