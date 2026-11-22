@@ -97,8 +97,9 @@ export class HeartEngine {
     return `1 row added to "${tableName}".`;
   }
 
-  showRows(tableName) {
-    return this.#requireTable(tableName).rows.map(row => ({ ...row }));
+  showRows(tableName, pagination = {}) {
+    const rows = this.#requireTable(tableName).rows.map(row => ({ ...row }));
+    return this.#paginate(rows, pagination);
   }
 
   showColumns(tableName) {
@@ -114,7 +115,7 @@ export class HeartEngine {
     return this.queryRows(tableName, { type: "condition", column: columnName, operator, value: expected });
   }
 
-  queryRows(tableName, expression) {
+  queryRows(tableName, expression, pagination = {}) {
     const table = this.#requireTable(tableName);
     const validate = (node) => {
       if (!node || typeof node !== "object") throw new Error("Invalid query expression.");
@@ -156,7 +157,8 @@ export class HeartEngine {
       }
     };
     validate(expression);
-    return table.rows.filter(row => matches(row, expression)).map(row => ({ ...row }));
+    const rows = table.rows.filter(row => matches(row, expression)).map(row => ({ ...row }));
+    return this.#paginate(rows, pagination);
   }
 
   sortRows(tableName, columnName, direction = "ascending") {
@@ -225,6 +227,14 @@ export class HeartEngine {
       }
     }
     return `${removed} row(s) removed from "${tableName}".`;
+  }
+
+  #paginate(rows, { limit, offset = 0 } = {}) {
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("OFFSET must be a non-negative whole number.");
+    if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 0)) {
+      throw new Error("LIMIT must be a non-negative whole number.");
+    }
+    return rows.slice(offset, limit === undefined ? undefined : offset + limit);
   }
 
   #requireColumn(table, tableName, columnName) {
