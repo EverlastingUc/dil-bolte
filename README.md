@@ -12,20 +12,22 @@ HEART is being designed as both:
 - A standalone language with its own database engine.
 - A language that can offer SQL compatibility as the project matures.
 
-The long-term plan includes a lexer, parser, query planner, execution engine, storage engine, transactions, indexes, and relational operations.
+The long-term architecture includes a lexer, parser, query planner, execution engine, storage engine, transactions, indexes, and relational operations.
 
-## Current status: v0.1 foundation
+## Current status: v0.2 — persistent storage foundation
 
-The first implementation is intentionally small. It includes:
+HEART currently includes:
 - A JavaScript interpreter running on Node.js 20+.
-- An in-memory database engine.
+- A database engine with optional disk-backed storage.
 - Database and table creation.
 - `text`, `number`, and `boolean` columns.
-- Adding rows, showing rows, and finding rows.
+- Adding rows, showing rows, and equality searches.
+- Database listing.
+- Automatic JSON persistence for the CLI.
 - A command-line runner for `.hrt` files.
 - Automated tests using Node's built-in test runner.
 
-**Important:** v0.1 stores data in memory only. Data is lost when the process exits. Disk persistence, SQL compatibility, update/delete, joins, transactions, and indexes are not implemented yet.
+**Storage behavior:** the CLI saves each database under `.heart/databases/` in the current working directory. Database changes are written automatically. The engine can still run in memory-only mode when created without a storage directory. The JSON format is an early development format, not yet a stable interchange or backup format. Do not manually edit database files while HEART is running.
 
 ## Quick start
 
@@ -34,11 +36,6 @@ Requirements: Node.js 20 or newer.
 ```sh
 npm test
 npm start -- examples/school.hrt
-```
-
-Run the interactive prompt:
-
-```sh
 npm start
 ```
 
@@ -56,6 +53,7 @@ add column active as boolean to Students
 add row to Students name = "Ever", age = 18, active = true
 show all from Students
 find from Students where age is 18
+show databases
 ```
 
 ## Current command reference
@@ -63,14 +61,15 @@ find from Students where age is 18
 | Instruction | Purpose |
 |---|---|
 | `make database NAME` | Create a database |
-| `use database NAME` | Select the active database |
+| `use database NAME` | Select a database (loads it from disk when available) |
+| `show databases` | List known databases and the active one |
 | `make table NAME` | Create a table |
 | `add column NAME as TYPE to TABLE` | Add a typed column |
 | `add row to TABLE field = value` | Insert a row |
 | `show all from TABLE` | Display every row |
 | `find from TABLE where FIELD is VALUE` | Find matching rows |
 
-Supported column types: `text`, `number`, `boolean`.
+Supported column types: `text`, `number`, `boolean`. Missing fields in an inserted row are stored as `null`.
 
 Lines beginning with `#` are comments. Use one instruction per line.
 
@@ -81,12 +80,14 @@ Lines beginning with `#` are comments. Use one instruction per line.
 3. Give helpful errors that identify the source line.
 4. Build a working foundation before adding advanced database features.
 5. Preserve a path toward SQL compatibility without making SQL knowledge a requirement.
+6. Never silently claim durability: storage writes must be tested and documented.
 
 ## Planned milestones
 
-- [x] v0.1 foundation: interpreter, in-memory engine, core commands, CLI, tests.
-- [ ] v0.2: persistent database files and stronger schema management.
-- [ ] v0.3: richer search and filtering.
+- [x] v0.1: interpreter, in-memory engine, core commands, CLI, tests.
+- [x] v0.2 foundation: JSON disk persistence, automatic CLI saves, database listing.
+- [ ] v0.2 hardening: recovery, corruption diagnostics, schema validation, storage tests on Windows.
+- [ ] v0.3: richer filtering and comparison operators.
 - [ ] v0.4: update and delete operations.
 - [ ] v0.5: table relations and joins.
 - [ ] v1.0: stable engine and a documented SQL compatibility layer.
