@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 import { HeartEngine } from "../src/engine.js";
 import { HeartInterpreter } from "../src/interpreter.js";
 import { HeartEngine as PublicEngine, HeartInterpreter as PublicInterpreter } from "../src/index.js";
+import { tokenize } from "../src/lexer.js";
+import { parseLine, parseProgram } from "../src/parser.js";
 
 function createClassroom(heart = new HeartInterpreter()) {
   heart.execute([
@@ -184,4 +186,45 @@ test("runs the example through the CLI and reloads its saved database", () => {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("tokenizes strings with escaped quotes, numbers, booleans, and punctuation", () => {
+  assert.deepEqual(tokenize('name = "A, \\"B\\"" , score = -2.5, active = true'), [
+    { type: "identifier", value: "name" }, { type: "=", value: "=" },
+    { type: "string", value: 'A, "B"' }, { type: ",", value: "," },
+    { type: "identifier", value: "score" }, { type: "=", value: "=" },
+    { type: "number", value: -2.5 }, { type: ",", value: "," },
+    { type: "identifier", value: "active" }, { type: "=", value: "=" },
+    { type: "boolean", value: true }
+  ]);
+});
+
+test("parses HEART instructions into abstract syntax tree nodes", () => {
+  assert.deepEqual(parseLine('find from Students where age greater than 17'), {
+    type: "findRows", table: "Students", column: "age", operator: "greater than", value: 17
+  });
+  assert.deepEqual(parseLine('add row to Students name = "Ever", age = 18'), {
+    type: "addRow", table: "Students", values: { name: "Ever", age: 18 }
+  });
+});
+
+test("parses an entire source program and preserves line numbers", () => {
+  assert.deepEqual(parseProgram('# comment\\nmake database School\\n\\nuse database School'), [
+    { type: "makeDatabase", name: "School", line: 2 },
+    { type: "useDatabase", name: "School", line: 4 }
+  ]);
+});
+
+test("reports lexer and parser errors with source line numbers", () => {
+  assert.throws(() => parseProgram('make database Demo\\nadd row to Items name = "unfinished'), /Line 2: Unterminated text value/);
+  assert.throws(() => parseLine("make database"), /Expected a name/);
+});
+
+test("parses update assignments separately from their WHERE clause", () => {
+  const ast = parseLine('change rows in Students set name = "Everlasting", age = 19 where name is "Ever"');
+  assert.deepEqual(ast, {
+    type: "changeRows", table: "Students",
+    changes: { name: "Everlasting", age: 19 },
+    column: "name", value: "Ever"
+  });
 });
