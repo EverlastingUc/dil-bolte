@@ -1,6 +1,6 @@
 {
   "name": "heart-database-language",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "HEART is a beginner-friendly, English-inspired database programming language.",
