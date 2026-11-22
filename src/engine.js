@@ -1,5 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync } from "node:fs";
 import { HeartStorage } from "./storage.js";
 
 export class HeartEngine {
