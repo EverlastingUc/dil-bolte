@@ -51,7 +51,7 @@ export class HeartEngine {
     const database = this.#requireDatabase();
     this.#assertName(name, "table");
     if (database.has(name)) throw new Error(`Table "${name}" already exists.`);
-    database.set(name, { columns: new Map(), rows: [], constraints: { primaryKey: null, unique: [], required: [] } });
+    database.set(name, { columns: new Map(), rows: [], constraints: { primaryKey: null, unique: [], required: [], foreignKeys: [] } });
     try {
       this.#persistActive();
     } catch (error) {
@@ -88,6 +88,7 @@ export class HeartEngine {
     }
     for (const key of table.columns.keys()) if (!(key in row)) row[key] = null;
     this.#assertConstraints(table, [...table.rows, row]);
+    this.#assertDatabaseIntegrity(this.activeDatabase, new Map([[tableName, [...table.rows, row]]]));
     table.rows.push(row);
     try {
       this.#persistActive();
@@ -114,6 +115,9 @@ export class HeartEngine {
     if (primaryKey) result.push({ type: "primary key", column: primaryKey });
     for (const column of unique) result.push({ type: "unique", column });
     for (const column of required) result.push({ type: "required", column });
+    for (const foreignKey of this.#requireTable(tableName).constraints.foreignKeys ?? []) {
+      result.push({ type: "foreign key", column: foreignKey.column, references: foreignKey.referencedTable + "." + foreignKey.referencedColumn });
+    }
     return result;
   }
 
@@ -151,6 +155,35 @@ export class HeartEngine {
       throw error;
     }
     return 'Added ' + constraintType + ' constraint to "' + tableName + '.' + columnName + '".';
+  }
+
+  addForeignKey(tableName, columnName, referencedTableName, referencedColumnName) {
+    const database = this.#requireDatabase();
+    const table = this.#requireTable(tableName);
+    const referencedTable = database.get(referencedTableName);
+    if (!referencedTable) throw new Error('Referenced table "' + referencedTableName + '" does not exist.');
+    this.#requireColumn(table, tableName, columnName);
+    this.#requireColumn(referencedTable, referencedTableName, referencedColumnName);
+    if (table.columns.get(columnName) !== referencedTable.columns.get(referencedColumnName)) {
+      throw new Error("Foreign-key and referenced columns must have the same type.");
+    }
+    const targetIsUnique = referencedTable.constraints.primaryKey === referencedColumnName
+      || referencedTable.constraints.unique.includes(referencedColumnName);
+    if (!targetIsUnique) throw new Error('Referenced column "' + referencedTableName + "." + referencedColumnName + '" must be a primary key or unique.');
+    const foreignKeys = table.constraints.foreignKeys ?? [];
+    if (foreignKeys.some(key => key.column === columnName)) {
+      throw new Error('Column "' + columnName + '" already has a foreign-key constraint.');
+    }
+    const previous = [...foreignKeys];
+    table.constraints.foreignKeys = [...foreignKeys, { column: columnName, referencedTable: referencedTableName, referencedColumn: referencedColumnName }];
+    try {
+      this.#assertDatabaseIntegrity(this.activeDatabase);
+      this.#persistActive();
+    } catch (error) {
+      table.constraints.foreignKeys = previous;
+      throw error;
+    }
+    return 'Added foreign key "' + tableName + "." + columnName + '" referencing "' + referencedTableName + "." + referencedColumnName + '".';
   }
 
   countRows(tableName) {
@@ -207,6 +240,38 @@ export class HeartEngine {
     return this.#paginate(rows, pagination);
   }
 
+  joinRows(leftTableName, rightTableName, leftColumn, rightColumn) {
+    const database = this.#requireDatabase();
+    const leftTable = database.get(leftTableName);
+    const rightTable = database.get(rightTableName);
+    if (!leftTable) throw new Error('Table "' + leftTableName + '" does not exist.');
+    if (!rightTable) throw new Error('Table "' + rightTableName + '" does not exist.');
+    this.#requireColumn(leftTable, leftTableName, leftColumn);
+    this.#requireColumn(rightTable, rightTableName, rightColumn);
+    if (leftTable.columns.get(leftColumn) !== rightTable.columns.get(rightColumn)) {
+      throw new Error("Join columns must have the same type.");
+    }
+    const rightIndex = new Map();
+    for (const row of rightTable.rows) {
+      const value = row[rightColumn];
+      if (value === null) continue;
+      if (!rightIndex.has(value)) rightIndex.set(value, []);
+      rightIndex.get(value).push(row);
+    }
+    const result = [];
+    for (const leftRow of leftTable.rows) {
+      const value = leftRow[leftColumn];
+      if (value === null) continue;
+      for (const rightRow of rightIndex.get(value) ?? []) {
+        result.push({
+          [leftTableName]: { ...leftRow },
+          [rightTableName]: { ...rightRow }
+        });
+      }
+    }
+    return result;
+  }
+
   sortRows(tableName, columnName, direction = "ascending") {
     const table = this.#requireTable(tableName);
     this.#requireColumn(table, tableName, columnName);
@@ -242,6 +307,7 @@ export class HeartEngine {
     const matchingRows = table.rows.filter(row => row[whereColumn] === expected);
     const candidateRows = table.rows.map(row => matchingRows.includes(row) ? { ...row, ...Object.fromEntries(entries) } : row);
     this.#assertConstraints(table, candidateRows);
+    this.#assertDatabaseIntegrity(this.activeDatabase, new Map([[tableName, candidateRows]]));
     const originals = matchingRows.map(row => ({ ...row }));
     for (const row of matchingRows) {
       for (const [columnName, value] of entries) row[columnName] = value;
@@ -265,6 +331,7 @@ export class HeartEngine {
     const remaining = table.rows.filter(row => row[whereColumn] !== expected);
     const removed = table.rows.length - remaining.length;
     if (removed) {
+      this.#assertDatabaseIntegrity(this.activeDatabase, new Map([[tableName, remaining]]));
       const originalRows = table.rows;
       table.rows = remaining;
       try {
@@ -277,8 +344,27 @@ export class HeartEngine {
     return `${removed} row(s) removed from "${tableName}".`;
   }
 
+  #assertDatabaseIntegrity(databaseName, rowOverrides = new Map()) {
+    const database = this.databases.get(databaseName);
+    for (const [childName, childTable] of database) {
+      const childRows = rowOverrides.get(childName) ?? childTable.rows;
+      for (const foreignKey of childTable.constraints.foreignKeys ?? []) {
+        const parentTable = database.get(foreignKey.referencedTable);
+        if (!parentTable) throw new Error('Foreign key on "' + childName + '" references missing table "' + foreignKey.referencedTable + '".');
+        const parentRows = rowOverrides.get(foreignKey.referencedTable) ?? parentTable.rows;
+        const allowed = new Set(parentRows.map(row => row[foreignKey.referencedColumn]).filter(value => value !== null));
+        for (const row of childRows) {
+          const value = row[foreignKey.column];
+          if (value !== null && !allowed.has(value)) {
+            throw new Error('Foreign key violation: "' + childName + "." + foreignKey.column + '" has no matching value in "' + foreignKey.referencedTable + "." + foreignKey.referencedColumn + '".');
+          }
+        }
+      }
+    }
+  }
+
   #assertConstraints(table, rows) {
-    const constraints = table.constraints ?? { primaryKey: null, unique: [], required: [] };
+    const constraints = table.constraints ?? { primaryKey: null, unique: [], required: [], foreignKeys: [] };
     const requiredColumns = new Set([...constraints.required, ...(constraints.primaryKey ? [constraints.primaryKey] : [])]);
     for (const column of requiredColumns) {
       if (rows.some(row => row[column] === null || row[column] === undefined)) {
