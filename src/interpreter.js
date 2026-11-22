@@ -15,6 +15,8 @@ export class HeartInterpreter {
           case "showDatabases": return this.engine.listDatabases();
           case "makeTable": return this.engine.makeTable(node.name);
           case "addColumn": return this.engine.addColumn(node.table, node.name, node.columnType);
+          case "addConstraint": return this.engine.addConstraint(node.table, node.constraintType, node.column);
+          case "showConstraints": return this.engine.showConstraints(node.table);
           case "addRow": return this.engine.addRow(node.table, node.values);
           case "showColumns": return this.engine.showColumns(node.table);
           case "countRows": return this.engine.countRows(node.table);
