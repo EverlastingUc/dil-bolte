@@ -152,3 +152,8 @@ test("rejects numeric comparisons on text columns", () => {
   const heart = createClassroom();
   assert.throws(() => heart.execute('find from Students where name greater than "Alex"'), /requires a number column/);
 });
+
+test("rejects prototype-sensitive identifiers", () => {
+  const heart = new HeartInterpreter();
+  assert.throws(() => heart.execute("make database Safe\nuse database Safe\nmake table Items\nadd column constructor as text to Items"), /Invalid column name/);
+});
