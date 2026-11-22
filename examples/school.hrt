@@ -1,4 +1,4 @@
-# HEART example: create a tiny school database
+# HEART example: create, search, sort, update, and remove school records
 
 make database School
 use database School
@@ -12,4 +12,13 @@ add row to Students name = "Ever", age = 18, active = true
 add row to Students name = "Alex", age = 17, active = true
 
 show all from Students
-find from Students where age is 18
+find from Students where age greater than 17
+sort rows in Students by age descending
+
+change rows in Students set age = 19 where name is "Ever"
+remove rows from Students where name is "Alex"
+
+show all from Students
+count rows in Students
+show columns from Students
+show databases
