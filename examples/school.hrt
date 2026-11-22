@@ -1,0 +1,15 @@
+# HEART example: create a tiny school database
+
+make database School
+use database School
+
+make table Students
+add column name as text to Students
+add column age as number to Students
+add column active as boolean to Students
+
+add row to Students name = "Ever", age = 18, active = true
+add row to Students name = "Alex", age = 17, active = true
+
+show all from Students
+find from Students where age is 18
