@@ -11,6 +11,9 @@ class LineParser {
     let node;
     if (this.takeWords("make", "database")) node = { type: "makeDatabase", name: this.identifier() };
     else if (this.takeWords("use", "database")) node = { type: "useDatabase", name: this.identifier() };
+    else if (this.takeWords("begin", "transaction")) node = { type: "beginTransaction" };
+    else if (this.takeWords("commit", "transaction")) node = { type: "commitTransaction" };
+    else if (this.takeWords("rollback", "transaction")) node = { type: "rollbackTransaction" };
     else if (this.takeWords("show", "databases")) node = { type: "showDatabases" };
     else if (this.takeWords("make", "table")) node = { type: "makeTable", name: this.identifier() };
     else if (this.takeWords("add", "column")) {
