@@ -15,16 +15,20 @@ function buildIndex(rows, column) {
 }
 
 function cloneDatabase(database) {
-  return new Map([...database].map(([tableName, table]) => [tableName, {
-    columns: new Map(table.columns),
-    rows: table.rows.map(row => ({ ...row })),
-    constraints: {
-      primaryKey: table.constraints.primaryKey,
-      unique: [...table.constraints.unique],
-      required: [...table.constraints.required],
-      foreignKeys: (table.constraints.foreignKeys ?? []).map(key => ({ ...key }))
-    }
-  }]));
+  return new Map([...database].map(([tableName, table]) => {
+    const rows = table.rows.map(row => ({ ...row }));
+    return [tableName, {
+      columns: new Map(table.columns),
+      rows,
+      indexes: new Map([...(table.indexes ?? new Map()).keys()].map(column => [column, buildIndex(rows, column)])),
+      constraints: {
+        primaryKey: table.constraints.primaryKey,
+        unique: [...table.constraints.unique],
+        required: [...table.constraints.required],
+        foreignKeys: (table.constraints.foreignKeys ?? []).map(key => ({ ...key }))
+      }
+    }];
+  }));
 }
 
 export class HeartEngine {
