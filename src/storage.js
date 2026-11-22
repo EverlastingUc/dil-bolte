@@ -77,7 +77,9 @@ export class HeartStorage {
         || !(savedConstraints.primaryKey === null || (typeof savedConstraints.primaryKey === "string" && columns.has(savedConstraints.primaryKey)))
         || !Array.isArray(savedConstraints.unique)
         || !Array.isArray(savedConstraints.required)
-        || !Array.isArray(savedIndexes)\n        || savedIndexes.some(column => typeof column !== "string" || !columns.has(column))\n        || new Set(savedIndexes).size !== savedIndexes.length\n        || !Array.isArray(savedConstraints.foreignKeys ?? [])
+        || !Array.isArray(savedIndexes)
+        || savedIndexes.some(column => typeof column !== "string" || !columns.has(column))
+        || new Set(savedIndexes).size !== savedIndexes.length
         || [...savedConstraints.unique, ...savedConstraints.required].some(column => typeof column !== "string" || !columns.has(column))
         || (savedConstraints.foreignKeys ?? []).some(key => !isRecord(key)
           || typeof key.column !== "string" || !columns.has(key.column)
